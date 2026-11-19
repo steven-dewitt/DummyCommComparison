@@ -1,0 +1,8 @@
+# Test data stays on SharePoint: never commit workbooks or exports (this repository is public).
+*.xlsx
+*.xlsm
+*.xls
+*.csv
+!tests/*.py
+node_modules/
+__pycache__/

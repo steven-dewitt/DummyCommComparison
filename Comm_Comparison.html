@@ -1,0 +1,1250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dummy Comm Test Comparison</title>
+<!--
+  Dummy Comm Test Comparison - the browser version of the 234Comparison and 634Comparison
+  sheets of Dummy_Comm_Comparison_Spreadsheet.xlsx.
+  Runs entirely in the browser: no installation, no internet connection and no external
+  libraries. Open this file in Chrome, Edge, Firefox or Safari and load the workbook (its
+  Grade_234_TestData and Grade_634_TestData sheets are read) or a CSV export of one of those
+  sheets. Data never leaves the computer.
+-->
+<style>
+:root {
+  color-scheme: light;
+  --bg: #ffffff; --panel: #f7f7f5; --surface: #fcfcfb; --ink: #1b1b1a; --ink-2: #52514e; --muted: #75746f;
+  --line: #dcdbd6; --grid: #e7e6e2; --axis: #b9b8b2; --accent: #1f4e78; --accent-ink: #ffffff;
+  --accent-soft: #e3edf7; --sel: #eef4fb; --err: #b42318; --err-soft: #fdecea; --hilite: #fff4c2;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #141413; --panel: #1d1d1c; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #9a998f;
+    --line: #3a3a37; --grid: #2c2c2a; --axis: #55554f; --accent: #6ea8e0; --accent-ink: #0b1a29;
+    --accent-soft: #1e2f40; --sel: #1f2a36; --err: #f97066; --err-soft: #3a1d1a; --hilite: #3d3415;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #0ca30c; --s7: #9085e9; --s8: #e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #141413; --panel: #1d1d1c; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #9a998f;
+  --line: #3a3a37; --grid: #2c2c2a; --axis: #55554f; --accent: #6ea8e0; --accent-ink: #0b1a29;
+  --accent-soft: #1e2f40; --sel: #1f2a36; --err: #f97066; --err-soft: #3a1d1a; --hilite: #3d3415;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #0ca30c; --s7: #9085e9; --s8: #e66767;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Arial, sans-serif; }
+button, input { font: inherit; color: inherit; }
+h1, h2, h3 { margin: 0; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---- app bar */
+.appbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px;
+  padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 5; }
+.appbar h1 { font-size: 18px; }
+.status { margin: 0; color: var(--muted); font-size: 12px; }
+.status.busy::before { content: ""; display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 50%;
+  border: 2px solid var(--accent); border-right-color: transparent; vertical-align: -1px; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--bg); cursor: pointer; white-space: nowrap; min-height: 32px; }
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.small { padding: 3px 9px; font-size: 12px; min-height: 26px; }
+.btn:focus-visible, .field:focus-visible, .sortbtn:focus-visible, .tab:focus-visible, tr[tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ---- grade tabs */
+.tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; padding: 2px; background: var(--bg); gap: 2px; }
+.tabs[hidden] { display: none; }
+.tab { border: 0; background: none; border-radius: 6px; padding: 5px 14px; cursor: pointer; font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+.tab .n { font-weight: 400; color: var(--muted); font-size: 12px; margin-left: 4px; }
+.tab[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
+.tab[aria-selected="true"] .n { color: inherit; opacity: .8; }
+.tab:disabled { opacity: .45; cursor: default; }
+
+/* ---- layout */
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(440px, 38%); gap: 0; align-items: start; }
+.layout[hidden] { display: none; }
+main { padding: 16px; min-width: 0; }
+aside { border-left: 1px solid var(--line); background: var(--panel); padding: 14px 16px; position: sticky; top: var(--bar-h, 53px);
+  max-height: calc(100vh - var(--bar-h, 53px)); display: flex; flex-direction: column; min-width: 0; }
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  aside { position: static; max-height: none; border-left: 0; border-top: 1px solid var(--line); }
+  aside .tablewrap { max-height: 520px; }
+}
+section + section { margin-top: 22px; }
+.sectionhead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; margin-bottom: 8px; }
+.sectionhead h2 { font-size: 16px; }
+.reporttitle { font-size: 20px; margin-bottom: 12px; }
+.hint { color: var(--muted); font-size: 12px; margin: 4px 0 0; }
+
+/* ---- test slots */
+.slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.slot { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); cursor: pointer; }
+.slot.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.slot .top { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; color: var(--ink-2); font-weight: 600; }
+.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 6px; flex: none; }
+.slot input { width: 100%; margin-top: 4px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 5px;
+  background: var(--bg); font-size: 16px; font-weight: 700; }
+.slot input.bad { border-color: var(--err); background: var(--err-soft); }
+.slot .sub { font-size: 12px; color: var(--muted); margin-top: 3px; min-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slot .sub.err { color: var(--err); }
+.slot .x { border: 0; background: none; cursor: pointer; color: var(--muted); font-size: 16px; line-height: 1; padding: 2px 4px; border-radius: 4px; }
+.slot .x:hover { color: var(--ink); background: var(--line); }
+.slotbar { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+
+/* ---- tables */
+.scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+table.grid { border-collapse: collapse; font-size: 13px; width: 100%; }
+table.grid th, table.grid td { border: 1px solid var(--line); padding: 5px 8px; text-align: left; vertical-align: top; }
+table.grid thead th { background: var(--accent); color: var(--accent-ink); font-weight: 600; white-space: nowrap; }
+table.grid tbody th { background: var(--panel); font-weight: 600; white-space: nowrap; }
+table.grid td.num { text-align: right; white-space: nowrap; }
+table.summary td { min-width: 110px; font-weight: 600; }
+table.summary td.comments { font-weight: 400; min-width: 150px; }
+table.summary tr.group th { background: transparent; border-left: 0; border-right: 0; padding-top: 12px; color: var(--muted);
+  font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+details.more { margin-top: 10px; }
+details.more summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+.unit { color: var(--muted); font-weight: 400; }
+
+/* ---- charts */
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; }
+.chart { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 12px 12px 6px; min-width: 0; position: relative; }
+.chart h3 { font-size: 15px; text-align: center; }
+.chart .empty { color: var(--muted); text-align: center; padding: 40px 10px; font-size: 13px; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; margin-top: 6px; }
+.chart svg text { font-family: inherit; fill: var(--ink-2); }
+.chart svg .tick { font-size: 11px; fill: var(--muted); }
+.chart svg .axtitle { font-size: 12px; font-weight: 600; fill: var(--ink-2); }
+.chart svg .val { font-size: 11px; fill: var(--ink); }
+.chart svg .na { font-size: 11px; fill: var(--muted); font-style: italic; }
+.chart svg .cat { font-size: 12px; fill: var(--ink); font-weight: 600; }
+.chart svg .catsub { font-size: 11px; fill: var(--muted); }
+.chart svg .gridline { stroke: var(--grid); stroke-width: 1; }
+.chart svg .baseline { stroke: var(--axis); stroke-width: 1; }
+.chart svg .hit { fill: transparent; cursor: default; }
+.chart svg .bar, .chart svg text { pointer-events: none; }
+.chart svg .bar.on { filter: brightness(1.12); }
+.tooltip { position: fixed; z-index: 20; pointer-events: none; background: var(--bg); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 9px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.15); max-width: 260px; }
+.tooltip[hidden] { display: none; }
+.tooltip b { font-size: 13px; }
+.tooltip .tv { font-variant-numeric: tabular-nums; font-weight: 600; }
+.empty-state { color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 28px; text-align: center; }
+
+/* ---- test list */
+aside h2 { font-size: 15px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+aside h2 .count { color: var(--muted); font-size: 12px; font-weight: 400; }
+.field { width: 100%; padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.sortbar { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0; align-items: center; }
+.sortbar .lbl { font-size: 12px; color: var(--muted); margin-right: 2px; }
+.sortbtn { border: 1px solid var(--accent); background: var(--bg); color: var(--accent); border-radius: 999px; font-size: 11px;
+  font-weight: 700; letter-spacing: .03em; padding: 3px 10px; cursor: pointer; }
+.sortbtn.on { background: var(--accent); color: var(--accent-ink); }
+.tablewrap { overflow: auto; flex: 1; min-height: 120px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+table.list { border-collapse: collapse; width: 100%; font-size: 12px; }
+table.list th { position: sticky; top: 0; background: var(--accent); color: var(--accent-ink); text-align: left; padding: 5px 6px;
+  font-weight: 600; z-index: 1; white-space: nowrap; }
+table.list td { padding: 4px 6px; border-bottom: 1px solid var(--grid); overflow-wrap: anywhere; }
+table.list td:first-child, table.list td:nth-child(2) { white-space: nowrap; }
+table.list tbody tr { cursor: pointer; }
+table.list tbody tr:hover { background: var(--sel); }
+table.list tr.picked td { background: var(--accent-soft); font-weight: 600; }
+table.list td:first-child { font-weight: 600; }
+table.list .slotmark { display: inline-block; min-width: 18px; text-align: center; color: #fff; border-radius: 4px; font-size: 11px;
+  font-weight: 700; margin-left: 6px; padding: 0 3px; }
+mark { background: var(--hilite); color: inherit; padding: 0; }
+
+/* ---- start screen */
+.dropzone { max-width: 640px; margin: 48px auto; padding: 32px 28px; border: 2px dashed var(--line); border-radius: 12px; text-align: center; }
+.dropzone[hidden] { display: none; }
+.dropzone h2 { font-size: 20px; margin-bottom: 8px; }
+.dropzone ol { text-align: left; margin: 18px auto 10px; max-width: 520px; padding-left: 20px; }
+.dropzone li { margin: 6px 0; }
+body.dragover .dropzone, body.dragover main { outline: 3px dashed var(--accent); outline-offset: -8px; }
+.error { color: var(--err); font-weight: 600; }
+.notice { background: var(--hilite); border-radius: 6px; padding: 6px 10px; font-size: 12px; margin-top: 8px; }
+
+@media (max-width: 600px) {
+  .appbar { position: static; }
+  aside { top: 0; }
+  .dropzone { margin: 24px 16px; padding: 24px 16px; }
+  .appbar h1 { font-size: 16px; }
+}
+@media print {
+  @page { size: landscape; margin: 12mm; }
+  html, body { background: #fff; color: #000; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .charts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .appbar .actions, .tabs, aside, .slotbar, .no-print, .slot .x { display: none !important; }
+  .appbar { position: static; background: #fff; border: 0; padding: 0 0 8px; }
+  .layout { display: block; }
+  main { padding: 0; }
+  .slot { break-inside: avoid; }
+  .slot input { border: 0; padding: 0; background: none; }
+  .chart { break-inside: avoid; }
+  .scroll { overflow: visible; }
+  details.more:not([open]) { display: none; }
+}
+</style>
+</head>
+<body>
+<header class="appbar" id="appbar">
+  <div>
+    <h1>Dummy Comm Test Comparison</h1>
+    <p class="status" id="status">No data loaded</p>
+  </div>
+  <div class="tabs" id="tabs" role="tablist" aria-label="Grade" hidden></div>
+  <div class="actions">
+    <label class="btn primary" title="Open the comparison workbook (its Grade_234_TestData and Grade_634_TestData sheets are read) or a CSV of one of those sheets">
+      Open data file…<input type="file" id="file" accept=".xlsx,.xlsm,.csv,.txt" hidden>
+    </label>
+    <button class="btn" id="exportCsv" disabled title="All recorded values for the selected tests">⬇ CSV</button>
+    <button class="btn" id="print" disabled title="Print, or save as PDF">Print / PDF</button>
+  </div>
+</header>
+
+<div class="layout" id="layout" hidden>
+  <main id="main">
+    <h2 class="reporttitle" id="reportTitle"></h2>
+    <section>
+      <div class="sectionhead">
+        <h2>Choose tests</h2>
+        <span class="hint no-print" style="margin:0">Type a test no. or pick from the list · click a test in the list to fill the highlighted slot</span>
+      </div>
+      <datalist id="testIds"></datalist>
+      <div class="slots" id="slots"></div>
+      <div class="slotbar">
+        <button class="btn small" id="addSlot">+ Add test</button>
+        <button class="btn small" id="clearSlots">Clear all</button>
+      </div>
+      <div id="notices"></div>
+    </section>
+
+    <section>
+      <div class="sectionhead"><h2>Test details</h2></div>
+      <div id="summary"></div>
+    </section>
+
+    <section id="chartsSection">
+      <div class="sectionhead"><h2>Charts</h2></div>
+      <div class="charts" id="charts"></div>
+    </section>
+  </main>
+
+  <aside>
+    <h2><span id="listTitle">Test list</span> <span class="count" id="listCount"></span></h2>
+    <input class="field" id="filter" type="search" autocomplete="off" spellcheck="false" style="margin-top:8px">
+    <div class="sortbar" id="sortbar"><span class="lbl">Sort by</span></div>
+    <div class="tablewrap" id="listWrap">
+      <table class="list" id="list">
+        <thead><tr></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="hint">Click a test to put it in the highlighted slot; click it again to remove it. Click a sort button twice to reverse the order.</p>
+    <p class="hint">Data is remembered on this computer. <button class="btn small" id="forget">Forget saved data</button></p>
+  </aside>
+</div>
+
+<div class="dropzone" id="drop">
+  <h2>Load the test data to start</h2>
+  <div>Drop the workbook here, or use <b>Open data file…</b></div>
+  <ol>
+    <li>Use the existing comparison workbook (.xlsx or .xlsm). Its <b>Grade_234_TestData</b> and <b>Grade_634_TestData</b> sheets are read, so keep adding tests there as before. A CSV of either sheet also works.</li>
+    <li>Switch between <b>234</b> and <b>634</b> at the top, then pick up to five tests (or add more slots) by typing the test number or clicking it in the test list.</li>
+    <li>Sort and filter the test list, then print or save as PDF.</li>
+  </ol>
+  <p class="hint">Everything runs in this browser. The file is not uploaded anywhere.</p>
+  <p class="error" id="loadError"></p>
+</div>
+
+<div class="tooltip" id="tip" hidden></div>
+
+<script>
+'use strict';
+
+/* ============================================================ definitions */
+const STORE_KEY = 'comm-compare-v1';
+const DEFAULT_SLOTS = 5, MAX_SLOTS = 8;
+
+// Placeholder rows in the data sheets that are not tests.
+const NOT_A_TEST = /^(not tested|format line)$/i;
+
+/*
+ * One entry per comparison sheet. `fields` are the data sheet's columns in sheet order:
+ *   head  - the column heading (matched ignoring case, spaces and punctuation)
+ *   occ   - which occurrence of a heading that appears more than once (0 = first)
+ *   id    - an identifier: numbers are shown as written, without separators
+ *   date  - an Excel date
+ *   num   - decimal places to show; sep - use thousands separators
+ */
+const GRADES = {
+  234: {
+    title: '234 Dummy Comm Testing',
+    sheet: 'Grade_234_TestData',
+    comparisonSheet: '234Comparison',
+    testHead: 'Set #',
+    xTitle: 'Set Number',
+    detect: ['test', 'life'],
+    fields: [
+      { key: 'test', head: 'Set Number', id: true, alias: ['setno', 'setnum', 'set'] },
+      { key: 'lso', head: 'LSO No', id: true, alias: ['lsonumber', 'lso'] },
+      { key: 'face', head: 'Wear Face' },
+      { key: 'lot', head: 'Lot', id: true },
+      { key: 'bake', head: 'Bake', id: true },
+      { key: 'mfDate', head: 'Test Date', date: true },
+      { key: 'mfMachine', head: 'Test Machine' },
+      { key: 'mfSpeed', head: 'Speed (fpm)' },
+      { key: 'mfPressure', head: 'Pressure' },
+      { key: 'cvdStart', head: 'C.V.D. (Start)', num: 2 },
+      { key: 'cfStart', head: 'C.F. (Start)', num: 3 },
+      { key: 'tempStart', head: 'Temp (Start)' },
+      { key: 'cvd75', head: 'C.V.D. (75amp/70deg)', num: 2 },
+      { key: 'cf75', head: 'C.F. (75amp/70deg)', num: 3 },
+      { key: 'temp75', head: 'Temp (75amp/70deg)' },
+      { key: 'cvdNoHeat', head: 'C.V.D. (No Heat)', num: 2 },
+      { key: 'cfNoHeat', head: 'C.F. (No Heat)', num: 3 },
+      { key: 'tempNoHeat', head: 'Temp (No Heat)' },
+      { key: 'cfNoLoad', head: 'C.F. (No Load)', num: 3 },
+      { key: 'tempNoLoad', head: 'Temp (No Load)' },
+      { key: 'mfAmbT', head: 'Ambient Temp (°C)' },
+      { key: 'mfAmbRH', head: 'Ambient RH (%)' },
+      { key: 'date', head: 'Test Date', occ: 1, date: true },
+      { key: 'machine', head: 'Test Machine', occ: 1 },
+      { key: 'speed', head: 'Speed (fpm)', occ: 1 },
+      { key: 'pressure', head: 'Pressure', occ: 1 },
+      { key: 'curDen', head: 'Cur. Den. (APSI)' },
+      { key: 'ringTemp', head: 'Ring Temp C', label: 'Ring Temp (°C)' },
+      { key: 'life', head: 'Brush Life (Hrs/in)', num: 0, sep: true },
+      { key: 'cof', head: 'Coef. Of Friction', num: 3 },
+      { key: 'cvd', head: 'Contact Drop (Volts)', num: 2 },
+      { key: 'ambT', head: 'Ambient Temp (°C)', occ: 1 },
+      { key: 'ambRH', head: 'Ambient RH (%)', occ: 1 },
+      { key: 'lab', head: 'Lab' },
+      { key: 'spc', head: 'SPC Data' },
+      { key: 'comments', head: 'Comments' },
+      { key: 'grade', head: 'Grade', id: true },
+    ],
+    // Rows 4-6 of the 234Comparison sheet (its "Bake" row shows the lot, so both are listed), plus comments.
+    summary: [['Grade', 'grade'], ['Lot', 'lot'], ['Bake', 'bake'], ['LSO Number', 'lso'], ['Comments', 'comments']],
+    groups: [
+      ['Test', ['face', 'lab', 'spc']],
+      ['Modified friction testing', ['mfDate', 'mfMachine', 'mfSpeed', 'mfPressure', 'cvdStart', 'cfStart', 'tempStart', 'cvd75', 'cf75',
+        'temp75', 'cvdNoHeat', 'cfNoHeat', 'tempNoHeat', 'cfNoLoad', 'tempNoLoad', 'mfAmbT', 'mfAmbRH']],
+      ['Dummy commutator testing', ['date', 'machine', 'speed', 'pressure', 'curDen', 'ringTemp', 'life', 'cof', 'cvd', 'ambT', 'ambRH']],
+    ],
+    // The three charts on the 234Comparison sheet, top to bottom, with its data-label formats.
+    charts: [
+      { id: 'ringTemp', key: 'ringTemp', title: 'Ring Temp °C', y: 'Temperature (°C)', unit: '°C', dp: 0, sep: true },
+      { id: 'life', key: 'life', title: 'Brush Life (Hrs/in)', y: 'Hours per inch', unit: 'hrs/in', dp: 0, sep: true },
+      { id: 'cof', key: 'cof', title: 'Coef. Of Friction', y: 'Coefficient of friction', unit: '', dp: 3, sep: false },
+    ],
+    list: [['test', 'Set #'], ['lot', 'Lot'], ['bake', 'Bake'], ['mfDate', 'Test date'], ['face', 'Wear face']],
+    sorts: [['test', 'TEST'], ['lot', 'LOT'], ['bake', 'BAKE'], ['mfDate', 'DATE']],
+    dateKey: 'mfDate', // default order: newest first
+    search: ['comments'],
+    placeholder: 'Filter: set, lot, bake, date, comments…',
+    chartSub: (v) => (v.lot != null ? `Lot ${v.lot}` : ''),
+    slotSub: (v) => [v.lot != null ? `Lot ${v.lot}` : null, v.mfDate != null ? showDate(v.mfDate) : null],
+  },
+  634: {
+    title: '634 Dummy Comm Testing',
+    sheet: 'Grade_634_TestData',
+    comparisonSheet: '634Comparison',
+    testHead: 'Test # (Lot)',
+    xTitle: 'Test Number (Lot)',
+    detect: ['test', 'lifeAvg'],
+    fields: [
+      { key: 'test', head: 'Lot Num.', id: true, alias: ['lot', 'lotno', 'lotnumber'] },
+      { key: 'bake', head: 'Bake Num.', id: true, alias: ['bake', 'bakeno', 'bakenumber'] },
+      { key: 'set', head: 'Set Num.', id: true, alias: ['set', 'setno', 'setnumber'] },
+      { key: 'lso', head: 'LSO Num.', id: true, alias: ['lso', 'lsono', 'lsonumber'] },
+      { key: 'date', head: 'Date', date: true },
+      { key: 'machine', head: 'Machine' },
+      { key: 'speed', head: 'Sliding Speed (fpm)' },
+      { key: 'pressure', head: 'Spring Pressure (psi)' },
+      { key: 'curDen', head: 'Current Density APSI' },
+      { key: 'ringTemp', head: 'Slip Ring Temp. (°C)' },
+      { key: 'lifePos', head: 'Positive Brush Life (hrs/in)', num: 0, sep: true },
+      { key: 'lifeNeg', head: 'Negative Brush Life (hrs/in)', num: 0, sep: true },
+      { key: 'lifeAvg', head: 'Average Brush Life (hrs/in)', num: 1, sep: true },
+      { key: 'cof', head: 'Coefficient of Friction', num: 4 },
+      { key: 'cvd', head: 'Contact Voltage Drop (Volts)', num: 2 },
+      { key: 'spc', head: 'SPC Data' },
+      { key: 'lab', head: 'Lab' },
+      { key: 'status', head: 'Parma Testing Status', alias: ['status', 'testingstatus'] },
+      { key: 'comments', head: 'Comments' },
+      { key: 'rh', head: 'Relative Humidity (%)' },
+      { key: 'temp', head: 'Temperature (°C)' },
+      { key: 'grade', head: 'Grade', id: true },
+    ],
+    // Rows 4-6 of the 634Comparison sheet, plus the testing status and comments.
+    summary: [['Set #', 'set'], ['Bake', 'bake'], ['LSO', 'lso'], ['Testing status', 'status'], ['Comments', 'comments']],
+    groups: [
+      ['Test', ['grade', 'date', 'machine', 'spc', 'lab']],
+      ['Conditions', ['speed', 'pressure', 'curDen', 'ringTemp', 'rh', 'temp']],
+      ['Results', ['lifePos', 'lifeNeg', 'lifeAvg', 'cof', 'cvd']],
+    ],
+    // The three charts on the 634Comparison sheet, top to bottom.
+    charts: [
+      { id: 'lifeAvg', key: 'lifeAvg', title: 'Average Brush Life (hrs/in)', y: 'Hours per inch', unit: 'hrs/in', dp: 0, sep: true },
+      { id: 'cof', key: 'cof', title: 'Coefficient of Friction', y: 'Coefficient of friction', unit: '', dp: 4, sep: false },
+      { id: 'cvd', key: 'cvd', title: 'Contact Voltage Drop (Volts)', y: 'Volts', unit: 'V', dp: 2, sep: false },
+    ],
+    list: [['test', 'Test # (Lot)'], ['set', 'Set #'], ['bake', 'Bake'], ['date', 'Date'], ['status', 'Status']],
+    sorts: [['test', 'TEST'], ['set', 'SET'], ['bake', 'BAKE'], ['date', 'DATE'], ['status', 'STATUS']],
+    dateKey: 'date',
+    search: ['comments', 'lso'],
+    placeholder: 'Filter: lot, set, bake, status, comments…',
+    chartSub: (v) => (v.set != null ? `Set ${v.set}` : ''),
+    slotSub: (v) => [v.set != null ? `Set ${v.set}` : null, v.status],
+  },
+};
+const GRADE_IDS = Object.keys(GRADES);
+for (const g of GRADE_IDS) GRADES[g].FIELD = Object.fromEntries(GRADES[g].fields.map((f) => [f.key, f]));
+
+/* ============================================================== utilities */
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+const normHead = (v) => String(v ?? '').toLowerCase().replace(/[^0-9a-z]/g, '');
+const ERROR_TEXT = /^#(N\/A|REF!|VALUE!|DIV\/0!|NAME\?|NUM!|NULL!|SPILL!|CALC!)$/i;
+const slotColor = (i) => `var(--s${i + 1})`;
+const pad2 = (n) => String(n).padStart(2, '0');
+const fmtDate = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+/** An Excel date serial as yyyy-mm-dd (text dates are shown as written). */
+function showDate(v) {
+  if (!isNum(v)) return String(v);
+  const d = new Date(Math.round((v - 25569) * 86400000));
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+}
+function fmtNum(v, dp, sep = true) {
+  if (!isNum(v)) return '';
+  return v.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp, useGrouping: sep });
+}
+/** Display a stored value: numbers in their column's format, text as written. */
+function show(G, key, v) {
+  if (v == null) return '';
+  const f = G.FIELD[key] || {};
+  if (f.date) return showDate(v);
+  if (!isNum(v)) return String(v);
+  if (f.id) return String(v);
+  if (f.num != null) return fmtNum(v, f.num, !!f.sep);
+  return v.toLocaleString('en-US', { maximumFractionDigits: 4, useGrouping: false });
+}
+const naturalKey = (s) => String(s).split(/(\d+)/).filter((t) => t !== '').map((t) => (/^\d+$/.test(t) ? +t : t.toLowerCase()));
+function cmpKeys(a, b) {
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    const x = a[i], y = b[i];
+    if (x === y) continue;
+    if (typeof x === typeof y) return x < y ? -1 : 1;
+    return typeof x === 'number' ? -1 : 1;
+  }
+  return a.length - b.length;
+}
+const XML_ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+const decodeXml = (s) => s.replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (m, e) =>
+  e[0] === '#' ? String.fromCodePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : +e.slice(1)) : XML_ENT[e] ?? m);
+
+/* ============================================================ zip reading */
+function unzip(buf) {
+  const u8 = new Uint8Array(buf), dv = new DataView(buf);
+  let eocd = -1;
+  for (let i = u8.length - 22; i >= Math.max(0, u8.length - 65557); i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('This is not an .xlsx/.xlsm workbook (older .xls files: re-save as .xlsx or .xlsm in Excel).');
+  const count = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const entries = new Map(), dec = new TextDecoder();
+  for (let n = 0; n < count; n++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error('The workbook file is damaged (bad zip directory).');
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+    const nlen = dv.getUint16(p + 28, true), xlen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true);
+    const off = dv.getUint32(p + 42, true);
+    entries.set(dec.decode(u8.subarray(p + 46, p + 46 + nlen)), { method, csize, off });
+    p += 46 + nlen + xlen + clen;
+  }
+  const raw = (e) => {
+    const start = e.off + 30 + dv.getUint16(e.off + 26, true) + dv.getUint16(e.off + 28, true);
+    return u8.subarray(start, start + e.csize);
+  };
+  return {
+    /** The entry's unpacked bytes as a stream. */
+    bytes(name) {
+      const e = entries.get(name);
+      if (!e) return null;
+      if (e.method === 0) return new Blob([raw(e)]).stream();
+      if (e.method !== 8) throw new Error(`Unsupported compression in ${name}.`);
+      if (typeof DecompressionStream === 'undefined')
+        throw new Error('This browser cannot read Excel files. Use a current Chrome, Edge, Firefox or Safari, or load a CSV.');
+      return new Blob([raw(e)]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+    },
+    /** The entry as a stream of text chunks (sheets can be 100 MB+ once unpacked). */
+    stream(name) {
+      const s = this.bytes(name);
+      return s ? s.pipeThrough(new TextDecoderStream()) : null;
+    },
+    async text(name) {
+      const s = this.bytes(name);
+      return s ? new TextDecoder().decode(await new Response(s).arrayBuffer()) : null;
+    },
+  };
+}
+function resolvePath(base, target) {
+  if (target.startsWith('/')) return target.slice(1);
+  const parts = base.split('/').slice(0, -1);
+  for (const seg of target.split('/')) {
+    if (seg === '..') parts.pop(); else if (seg !== '.' && seg !== '') parts.push(seg);
+  }
+  return parts.join('/');
+}
+
+/* =========================================================== xlsx reading */
+const byTag = (node, tag) => Array.from(node.getElementsByTagNameNS('*', tag));
+const attrLocal = (el, local) => { for (const a of el.attributes) if (a.localName === local && a.prefix) return a.value; return null; };
+function colIndex(ref) {
+  let n = 0;
+  for (const ch of ref) { const c = ch.charCodeAt(0); if (c < 65 || c > 90) break; n = n * 26 + (c - 64); }
+  return n - 1;
+}
+/** Value of a simple formula with no cached result, e.g. =AVERAGE(0.077,0.068,0.066). */
+function evalSimple(f) {
+  const s = f.trim().replace(/^=/, '');
+  if (/^[-+]?\d*\.?\d+(e[-+]?\d+)?$/i.test(s)) return Number(s);
+  const m = s.match(/^(AVERAGE|SUM|MIN|MAX)\(([-+0-9.,\se]*)\)$/i);
+  if (!m) return null;
+  const xs = m[2].split(',').map((x) => x.trim()).filter(Boolean).map(Number);
+  if (!xs.length || !xs.every(Number.isFinite)) return null;
+  const sum = xs.reduce((a, b) => a + b, 0);
+  return { AVERAGE: sum / xs.length, SUM: sum, MIN: Math.min(...xs), MAX: Math.max(...xs) }[m[1].toUpperCase()];
+}
+const ROW_RE = /<(?:\w+:)?row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?row>)/g;
+const CELL_RE = /<(?:\w+:)?c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:\w+:)?c>)/g;
+const V_RE = /<(?:\w+:)?v>([\s\S]*?)<\/(?:\w+:)?v>/, F_RE = /<(?:\w+:)?f\b[^>]*>([\s\S]*?)<\/(?:\w+:)?f>/;
+const T_RE = /<(?:\w+:)?t\b[^>]*>([\s\S]*?)<\/(?:\w+:)?t>/g;
+
+async function readXlsx(buf) {
+  const zip = unzip(buf);
+  const parse = async (name) => {
+    const t = await zip.text(name);
+    return t == null ? null : new DOMParser().parseFromString(t, 'application/xml');
+  };
+  let wbPath = 'xl/workbook.xml';
+  const rootRels = await parse('_rels/.rels');
+  if (rootRels) {
+    const r = byTag(rootRels, 'Relationship').find((x) => /\/officeDocument$/.test(x.getAttribute('Type')));
+    if (r) wbPath = resolvePath('', r.getAttribute('Target'));
+  }
+  const wb = await parse(wbPath);
+  if (!wb) throw new Error('No workbook found inside the file.');
+  const rels = await parse(wbPath.replace(/([^/]+)$/, '_rels/$1.rels'));
+  const relTarget = {}, relType = {};
+  for (const r of rels ? byTag(rels, 'Relationship') : []) {
+    relTarget[r.getAttribute('Id')] = resolvePath(wbPath, r.getAttribute('Target'));
+    relType[r.getAttribute('Id')] = r.getAttribute('Type');
+  }
+  let strings = [];
+  const sstId = Object.keys(relType).find((k) => /\/sharedStrings$/.test(relType[k]));
+  if (sstId) {
+    const sst = await parse(relTarget[sstId]);
+    if (sst) strings = byTag(sst, 'si').map((si) => byTag(si, 't').filter((t) => t.parentNode.localName !== 'rPh')
+      .map((t) => t.textContent).join(''));
+  }
+  const sheets = byTag(wb, 'sheet').map((s) => ({ name: s.getAttribute('name'), path: relTarget[attrLocal(s, 'id')] }));
+
+  function parseRows(text, out, minCells) {
+    ROW_RE.lastIndex = 0;
+    let m, rIdx = out.last;
+    while ((m = ROW_RE.exec(text))) {
+      const rAttr = m[1].match(/\br="(\d+)"/);
+      rIdx = rAttr ? +rAttr[1] : rIdx + 1;
+      const inner = m[2];
+      if (!inner) continue;
+      // Most rows of these sheets hold a single filled-down Grade cell: skip them cheaply.
+      if (minCells > 1) { const first = inner.indexOf('<c'); if (first < 0 || inner.indexOf('<c', first + 2) < 0) continue; }
+      const cells = [];
+      let n = 0, ci = 0, c;
+      CELL_RE.lastIndex = 0;
+      while ((c = CELL_RE.exec(inner))) {
+        const attrs = c[1], body = c[2] || '';
+        const ref = attrs.match(/\br="([A-Z]+)/);
+        if (ref) ci = colIndex(ref[1]);
+        const t = (attrs.match(/\bt="(\w+)"/) || [])[1];
+        const vm = body.match(V_RE), vText = vm && vm[1] !== '' ? vm[1] : null;
+        let v = null;
+        if (t === 's') v = vText != null ? strings[+vText] ?? '' : null;
+        else if (t === 'inlineStr') { const parts = []; let tm; T_RE.lastIndex = 0; while ((tm = T_RE.exec(body))) parts.push(decodeXml(tm[1])); v = parts.join(''); }
+        else if (t === 'str') v = vText != null ? decodeXml(vText) : null;
+        else if (t === 'b') v = vText != null ? vText === '1' : null;
+        else if (t === 'e') v = null;
+        else if (vText != null) { const x = parseFloat(vText); v = Number.isFinite(x) ? x : decodeXml(vText); }
+        if (v == null && vText == null && t !== 'e') { const fm = body.match(F_RE); if (fm) v = evalSimple(decodeXml(fm[1])); }
+        if (v != null && v !== '') n++;
+        cells[ci++] = v;
+      }
+      if (n >= minCells) out.push({ r: rIdx, cells });
+    }
+    out.last = rIdx;
+  }
+
+  return {
+    sheetNames: sheets.map((s) => s.name),
+    /** Rows with at least `minCells` values, as [{ r: row number, cells: [...] }]. Read as a stream. */
+    async rows(name, minCells = 2) {
+      const sheet = sheets.find((s) => s.name === name);
+      const stream = sheet && sheet.path ? zip.stream(sheet.path) : null;
+      const out = [];
+      out.last = 0;
+      if (!stream) return out;
+      const reader = stream.getReader();
+      let buf = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += value;
+        if (buf.length > 1 << 20) {
+          const end = buf.lastIndexOf('</row>');
+          if (end >= 0) { parseRows(buf.slice(0, end + 6), out, minCells); buf = buf.slice(end + 6); }
+        }
+      }
+      parseRows(buf, out, minCells);
+      return out;
+    },
+  };
+}
+
+/* ============================================================ csv reading */
+function parseCsv(text) {
+  text = text.replace(/^﻿/, '');
+  const first = text.split(/\r?\n/, 1)[0];
+  const delim = (first.match(/;/g) || []).length > (first.match(/,/g) || []).length ? ';'
+    : (first.match(/\t/g) || []).length > (first.match(/,/g) || []).length ? '\t' : ',';
+  const rows = [];
+  let row = [], field = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQ) {
+      if (ch === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQ = false; }
+      else field += ch;
+    } else if (ch === '"') inQ = true;
+    else if (ch === delim) { row.push(field); field = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); rows.push(row); row = []; field = '';
+    } else field += ch;
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  return rows.map((cells, i) => ({ r: i + 1, cells })).filter((x) => x.cells.filter((c) => c !== '').length >= 2);
+}
+
+/* ========================================================= test database */
+/** Text dates from a CSV (2026-10-05, 10/5/2026) as Excel date serials, so they sort and show like the workbook's. */
+function dateSerial(s) {
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T].*)?$/), y, mo, d;
+  if (m) [y, mo, d] = [+m[1], +m[2], +m[3]];
+  else if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/))) [y, mo, d] = [+m[3], +m[1], +m[2]];
+  else return null;
+  const t = Date.UTC(y, mo - 1, d), dt = new Date(t);
+  return dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d ? t / 86400000 + 25569 : null;
+}
+function cleanValue(v, f) {
+  if (v == null || typeof v === 'boolean') return v == null ? null : String(v);
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  const s = String(v).trim();
+  if (s === '' || ERROR_TEXT.test(s)) return null;
+  if (f.date) return dateSerial(s) ?? s;
+  if (!f.date && /^[-+]?(\d+(,\d{3})*|\d*)(\.\d+)?([eE][-+]?\d+)?$/.test(s) && /\d/.test(s)) return Number(s.replace(/,/g, ''));
+  return s;
+}
+
+/** Turn a data sheet (rows from readXlsx/parseCsv) into one grade's test database; null if the layout isn't this grade's. */
+function buildDatabase(rows, G, source) {
+  let h = -1, cols = null;
+  for (let r = 0; r < Math.min(rows.length, 20) && h < 0; r++) {
+    const norm = rows[r].cells.map(normHead);
+    const find = (f) => {
+      for (const name of [normHead(f.head), ...(f.alias || [])]) {
+        let seen = 0;
+        for (let i = 0; i < norm.length; i++) if (norm[i] === name && seen++ === (f.occ || 0)) return i;
+      }
+      return -1;
+    };
+    const c = Object.fromEntries(G.fields.map((f) => [f.key, find(f)]));
+    if (G.detect.every((k) => c[k] >= 0)) { h = r; cols = c; }
+  }
+  if (h < 0) return null;
+  const tests = [], seen = {};
+  for (let r = h + 1; r < rows.length; r++) {
+    const row = rows[r].cells;
+    const idRaw = row[cols.test];
+    if (idRaw == null || String(idRaw).trim() === '' || NOT_A_TEST.test(String(idRaw).trim())) continue;
+    const id = typeof idRaw === 'number' ? String(idRaw) : String(idRaw).trim();
+    const v = {};
+    for (const f of G.fields) v[f.key] = cols[f.key] >= 0 ? cleanValue(row[cols[f.key]], f) : null;
+    v.test = id;
+    seen[id] = (seen[id] || 0) + 1;
+    const label = seen[id] > 1 ? `${id} (${seen[id]})` : id;
+    tests.push({ label, id, row: rows[r].r, v });
+  }
+  if (!tests.length) return null;
+  const missing = G.fields.filter((f) => cols[f.key] < 0).map((f) => f.label || f.head);
+  return { source, loadedAt: Date.now(), tests, missing: [...new Set(missing)] };
+}
+function hydrate(db) {
+  db.index = new Map();
+  for (const t of db.tests) db.index.set(t.label.toLowerCase(), t);
+  db.duplicates = [...new Set(db.tests.filter((t) => t.label !== t.id).map((t) => t.id))];
+  return db;
+}
+/** The tests chosen on a comparison sheet ("Choose Test # From Table" row). */
+function readPreset(rows) {
+  for (const { cells } of rows) {
+    if (typeof cells[0] === 'string' && /choose\s+test/i.test(cells[0]))
+      return cells.slice(1, 1 + MAX_SLOTS).map((v) => (v == null ? '' : String(v).trim()));
+  }
+  return null;
+}
+/** Returns { [grade]: db } for every grade found in the file. */
+async function loadFile(file, progress) {
+  const name = file.name, found = {};
+  if (/\.(csv|txt)$/i.test(name)) {
+    const rows = parseCsv(await file.text());
+    for (const g of GRADE_IDS) {
+      const db = buildDatabase(rows, GRADES[g], name);
+      if (db) { found[g] = db; break; }
+    }
+    if (!Object.keys(found).length)
+      throw new Error('No test data found. Expected the columns of Grade_234_TestData ("Set Number", "Brush Life (Hrs/in)" …) or Grade_634_TestData ("Lot Num.", "Average Brush Life (hrs/in)" …).');
+    return found;
+  }
+  if (/\.xls$/i.test(name)) throw new Error('Old .xls files are not supported: open it in Excel and save as .xlsx or .xlsm.');
+  const book = await readXlsx(await file.arrayBuffer());
+  const skip = /control|comparison/i;
+  for (const g of GRADE_IDS) {
+    const G = GRADES[g];
+    const named = book.sheetNames.filter((s) => s.toLowerCase() === G.sheet.toLowerCase());
+    const others = book.sheetNames.filter((s) => s.toLowerCase() !== G.sheet.toLowerCase() && !skip.test(s));
+    for (const sheet of [...named, ...others]) {
+      if (Object.values(found).some((db) => db.sheet === sheet)) continue;
+      progress(`Reading ${sheet}…`);
+      const db = buildDatabase(await book.rows(sheet), G, name);
+      if (db) { db.sheet = sheet; found[g] = db; break; }
+    }
+    if (found[g] && book.sheetNames.includes(G.comparisonSheet)) found[g].preset = readPreset(await book.rows(G.comparisonSheet));
+  }
+  if (!Object.keys(found).length)
+    throw new Error('No test data found. Expected a Grade_234_TestData or Grade_634_TestData sheet (Set Number / Lot Num., Brush Life …).');
+  return found;
+}
+
+/* ================================================================ state */
+const freshView = (g) => ({ slots: Array(DEFAULT_SLOTS).fill(''), active: 0, sortKey: GRADES[g].dateKey, sortDir: -1, filter: '' });
+const state = { dbs: {}, grade: GRADE_IDS[0], views: Object.fromEntries(GRADE_IDS.map((g) => [g, freshView(g)])) };
+const typed = Object.fromEntries(GRADE_IDS.map((g) => [g, {}])); // per grade: slot index -> text that didn't match a test
+const G = () => GRADES[state.grade];
+const view = () => state.views[state.grade];
+const db = () => state.dbs[state.grade] || null;
+const typedNow = () => typed[state.grade];
+
+function save() {
+  try {
+    const dbs = {};
+    for (const [g, d] of Object.entries(state.dbs)) dbs[g] = { source: d.source, sheet: d.sheet, loadedAt: d.loadedAt, tests: d.tests, missing: d.missing };
+    const views = Object.fromEntries(Object.entries(state.views).map(([g, v]) => [g, { ...v, filter: '' }]));
+    localStorage.setItem(STORE_KEY, JSON.stringify({ dbs, grade: state.grade, views }));
+  } catch (e) { /* storage unavailable or full: the page still works */ }
+}
+function restore() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    if (!saved || !saved.dbs) return;
+    for (const g of GRADE_IDS) {
+      if (saved.dbs[g]) state.dbs[g] = hydrate(saved.dbs[g]);
+      if (saved.views && saved.views[g]) state.views[g] = { ...freshView(g), ...saved.views[g], filter: '' };
+    }
+    if (GRADES[saved.grade]) state.grade = saved.grade;
+  } catch (e) { /* ignore a damaged entry */ }
+}
+const testOf = (label, g = state.grade) => {
+  const d = state.dbs[g];
+  return label && d ? d.index.get(String(label).toLowerCase()) || null : null;
+};
+/** Filled slots, in slot order, keeping each slot's colour. */
+const picked = () => view().slots.map((l, i) => ({ i, t: testOf(l) })).filter((x) => x.t);
+function normaliseSlots(g = state.grade) {
+  const v = state.views[g];
+  v.slots = v.slots.map((l) => (testOf(l, g) ? testOf(l, g).label : ''));
+  while (v.slots.length < DEFAULT_SLOTS) v.slots.push('');
+  if (v.active >= v.slots.length) v.active = 0;
+}
+function nextEmpty(from = 0) {
+  const s = view().slots;
+  for (let k = 0; k < s.length; k++) { const i = (from + k) % s.length; if (!s[i]) return i; }
+  return -1;
+}
+function readHash() {
+  const p = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const g = p.get('grade');
+  if (g && GRADES[g] && state.dbs[g]) state.grade = g;
+  const tests = p.get('tests');
+  if (tests == null || !db()) return;
+  const labels = tests.split(',').map((s) => s.trim());
+  if (!labels.some((l) => testOf(l))) return;
+  view().slots = labels.slice(0, MAX_SLOTS).map((l) => (testOf(l) ? testOf(l).label : ''));
+  normaliseSlots();
+}
+function writeHash() {
+  const labels = view().slots.slice();
+  while (labels.length && !labels[labels.length - 1]) labels.pop();
+  let h = `#grade=${encodeURIComponent(state.grade)}`;
+  if (labels.length) h += '&tests=' + labels.map(encodeURIComponent).join(',');
+  try { if (location.hash !== h) history.replaceState(null, '', h); } catch (e) { /* file:// in some browsers */ }
+}
+
+/* ================================================================ charts */
+function niceStep(range, target = 5) {
+  const raw = range / target, mag = 10 ** Math.floor(Math.log10(raw)), n = raw / mag;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * mag;
+}
+function axisLabel(v, max, step) {
+  if (v === 0) return '0';
+  if (max >= 10000) return (v / 1000).toLocaleString('en-US', { maximumFractionDigits: 1 }) + 'K';
+  const dp = Math.min(4, (String(+step.toPrecision(6)).split('.')[1] || '').length);
+  return v.toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+}
+const textW = (s, size = 11) => String(s).length * size * 0.58;
+
+/** A column with a 4px rounded data end and a square base. */
+function colPath(x, y, w, h) {
+  if (h <= 0) return '';
+  const r = Math.min(4, w / 2, h);
+  return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+}
+
+/** One column per test: groups = [{ label, sub, v, slot, test }]; each column keeps its slot's colour. */
+function columnChart(width, groups, spec) {
+  const H = 300;
+  const all = groups.map((g) => g.v).filter(isNum);
+  const maxV = Math.max(0, ...all), minV = Math.min(0, ...all);
+  const step = niceStep((maxV - minV) || 1);
+  const top = Math.ceil(maxV / step - 1e-9) * step || step, bottom = Math.floor(minV / step + 1e-9) * step;
+  const ticks = [];
+  for (let t = bottom; t <= top + step / 2; t += step) ticks.push(+t.toFixed(10));
+  const tickW = Math.max(...ticks.map((t) => textW(axisLabel(t, top, step))));
+  const fmt = (v) => fmtNum(v, spec.dp, spec.sep);
+  const left = 26 + tickW + 8, right = 8;
+  const plotW = Math.max(60, width - left - right);
+  const band = plotW / groups.length;
+  const barW = Math.max(3, Math.min(56, band * 0.6));
+  const longest = Math.max(...groups.map((g) => textW(isNum(g.v) ? fmt(g.v) : 'n/a')));
+  const rotate = longest + 4 > band;
+  const padTop = rotate ? longest + 10 : 18;
+  const hasSub = groups.some((g) => g.sub);
+  const catW = Math.max(...groups.map((g) => textW(g.label, 12)));
+  const slant = catW + 6 > band;
+  // Sub-labels (lot / set) only when they fit; they are in the tooltip either way.
+  const showSub = hasSub && !slant && Math.max(...groups.map((g) => (g.sub ? textW(g.sub) : 0))) + 6 <= band;
+  const bottomPad = slant ? Math.min(90, catW * 0.75 + 16) + 20 : 22 + (showSub ? 14 : 0) + 20;
+  const plotH = H - padTop - bottomPad;
+  const y = (v) => padTop + ((top - v) / (top - bottom)) * plotH;
+  const y0 = y(0);
+  const parts = [];
+  for (const t of ticks) {
+    const ty = y(t);
+    parts.push(`<line class="${t === 0 ? 'baseline' : 'gridline'}" x1="${left}" x2="${left + plotW}" y1="${ty}" y2="${ty}"/>`);
+    parts.push(`<text class="tick" x="${left - 6}" y="${ty + 4}" text-anchor="end">${esc(axisLabel(t, top, step))}</text>`);
+  }
+  if (!ticks.includes(0)) parts.push(`<line class="baseline" x1="${left}" x2="${left + plotW}" y1="${y0}" y2="${y0}"/>`);
+  groups.forEach((g, gi) => {
+    const cx = left + band * gi + band / 2, bx = cx - barW / 2;
+    const tipData = `data-tip="${esc(JSON.stringify({ t: g.label, s: g.sub, v: isNum(g.v) ? fmt(g.v) : 'no value', u: spec.unit, n: spec.title }))}"`;
+    parts.push(`<rect class="hit" x="${left + band * gi}" y="${padTop}" width="${band}" height="${plotH}" ${tipData}/>`);
+    const lx = cx;
+    if (isNum(g.v)) {
+      const by = Math.min(y(g.v), y0), bh = Math.abs(y(g.v) - y0);
+      parts.push(g.v >= 0 ? `<path class="bar" d="${colPath(bx, by, barW, bh)}" fill="${slotColor(g.slot)}"/>`
+        : `<rect class="bar" x="${bx}" y="${by}" width="${barW}" height="${bh}" fill="${slotColor(g.slot)}"/>`);
+      const ly = (g.v >= 0 ? by : y0) - 5;
+      parts.push(rotate ? `<text class="val num" transform="translate(${lx + 4},${ly}) rotate(-90)">${esc(fmt(g.v))}</text>`
+        : `<text class="val num" x="${lx}" y="${ly}" text-anchor="middle">${esc(fmt(g.v))}</text>`);
+    } else {
+      const ly = y0 - 5;
+      parts.push(rotate ? `<text class="na" transform="translate(${lx + 4},${ly}) rotate(-90)">n/a</text>`
+        : `<text class="na" x="${lx}" y="${ly}" text-anchor="middle">n/a</text>`);
+    }
+    const base = y(bottom);
+    if (slant) {
+      parts.push(`<text class="cat" transform="translate(${cx + 4},${base + 14}) rotate(-40)" text-anchor="end">${esc(g.label)}</text>`);
+    } else {
+      parts.push(`<text class="cat" x="${cx}" y="${base + 17}" text-anchor="middle">${esc(g.label)}</text>`);
+      if (showSub && g.sub) parts.push(`<text class="catsub" x="${cx}" y="${base + 31}" text-anchor="middle">${esc(g.sub)}</text>`);
+    }
+  });
+  parts.push(`<text class="axtitle" transform="translate(13,${padTop + plotH / 2}) rotate(-90)" text-anchor="middle">${esc(spec.y)}</text>`);
+  parts.push(`<text class="axtitle" x="${left + plotW / 2}" y="${H - 5}" text-anchor="middle">${esc(spec.x)}</text>`);
+  return `<svg viewBox="0 0 ${width} ${H}" role="img" aria-label="${esc(spec.title)}">${parts.join('')}</svg>`;
+}
+
+function chartHtml(spec, sel, width) {
+  const g = G();
+  const groups = sel.map(({ i, t }) => ({ label: t.label, sub: g.chartSub(t.v), v: t.v[spec.key], slot: i, test: t }));
+  const body = groups.some((x) => isNum(x.v)) ? columnChart(width, groups, { ...spec, x: g.xTitle })
+    : '<div class="empty">No values recorded for these tests.</div>';
+  return `<h3>${esc(spec.title)}</h3>${body}`;
+}
+
+/* ================================================================ render */
+function renderAll() {
+  const loaded = GRADE_IDS.filter((g) => state.dbs[g]);
+  $('#layout').hidden = !loaded.length;
+  $('#drop').hidden = !!loaded.length;
+  $('#tabs').hidden = !loaded.length;
+  for (const id of ['exportCsv', 'print']) $('#' + id).disabled = !loaded.length;
+  if (!loaded.length) { $('#status').textContent = 'No data loaded'; return; }
+  if (!state.dbs[state.grade]) state.grade = loaded[0];
+  normaliseSlots();
+  const d = db(), g = G();
+  const sources = [...new Set(loaded.map((k) => state.dbs[k].source))];
+  $('#status').textContent = `${sources.join(' + ')} · ${d.sheet || d.source} · loaded ${fmtDate(new Date(d.loadedAt))}`;
+  $('#tabs').innerHTML = GRADE_IDS.map((k) => {
+    const on = k === state.grade, n = state.dbs[k] ? state.dbs[k].tests.length : 0;
+    return `<button class="tab" role="tab" data-grade="${k}" aria-selected="${on}" ${state.dbs[k] ? '' : 'disabled title="Not in the loaded file"'}>${k}<span class="n">${n ? n + ' tests' : '—'}</span></button>`;
+  }).join('');
+  $('#reportTitle').textContent = g.title;
+  document.title = `${g.title} – Comparison`;
+  $('#testIds').innerHTML = d.tests.map((t) => `<option value="${esc(t.label)}">${esc(g.slotSub(t.v).filter((x) => x != null).join(' · '))}</option>`).join('');
+  renderSlots();
+  renderNotices();
+  renderReport();
+  renderSortbar();
+  renderList();
+  writeHash();
+  save();
+  document.documentElement.style.setProperty('--bar-h', $('#appbar').offsetHeight + 'px');
+}
+
+function renderSlots() {
+  const v = view(), tp = typedNow(), g = G();
+  $('#slots').innerHTML = v.slots.map((label, i) => {
+    const t = testOf(label);
+    const bad = tp[i] != null && tp[i] !== '';
+    const sub = bad ? 'Test not found' : t ? g.slotSub(t.v).filter((x) => x != null).join(' · ') : 'Empty';
+    return `<div class="slot${i === v.active ? ' active' : ''}" data-slot="${i}">
+      <div class="top"><span><i class="swatch" style="background:${slotColor(i)}"></i>Test ${i + 1}</span>
+        ${label || bad ? `<button class="x" data-clear="${i}" title="Clear Test ${i + 1}" aria-label="Clear Test ${i + 1}">×</button>` : ''}</div>
+      <input list="testIds" data-input="${i}" value="${esc(bad ? tp[i] : label)}" placeholder="Test no." autocomplete="off" spellcheck="false"
+        aria-label="Test ${i + 1}" class="${bad ? 'bad' : ''}">
+      <div class="sub${bad ? ' err' : ''}">${esc(sub)}</div>
+    </div>`;
+  }).join('');
+  $('#addSlot').disabled = v.slots.length >= MAX_SLOTS;
+  $('#clearSlots').disabled = !v.slots.some(Boolean) && !Object.keys(tp).length;
+}
+
+function renderNotices() {
+  const d = db(), out = [];
+  const dupPicked = picked().filter(({ t }) => d.duplicates.includes(t.id));
+  if (dupPicked.length) {
+    const ids = [...new Set(dupPicked.map(({ t }) => t.id))];
+    out.push(`Test ${ids.map(esc).join(', ')} appears more than once in the data. Each run is listed separately: “${esc(ids[0])}”, “${esc(ids[0])} (2)” …`);
+  }
+  if (d.missing && d.missing.length)
+    out.push(`Columns not found in ${esc(d.sheet || d.source)}, shown as blank: ${d.missing.map(esc).join(', ')}.`);
+  $('#notices').innerHTML = out.map((m) => `<div class="notice">${m}</div>`).join('');
+}
+
+function renderReport() {
+  const sel = picked(), g = G();
+  if (!sel.length) {
+    $('#summary').innerHTML = '<div class="empty-state">Pick a test in one of the slots above to see its details and charts.</div>';
+    $('#charts').innerHTML = '';
+    return;
+  }
+  const head = `<thead><tr><th>${esc(g.testHead)}</th>${sel.map(({ i, t }) => `<th><i class="swatch" style="background:${slotColor(i)}"></i>${esc(t.label)}</th>`).join('')}</tr></thead>`;
+  const row = (label, key) => {
+    const f = g.FIELD[key];
+    const cls = key === 'comments' ? 'comments' : '';
+    return `<tr><th>${esc(label)}</th>${sel.map(({ t }) => {
+      const v = t.v[key];
+      return `<td class="${isNum(v) && !f.id && !f.date ? 'num' : ''} ${cls}">${esc(show(g, key, v))}</td>`;
+    }).join('')}</tr>`;
+  };
+  const summary = g.summary.map(([label, key]) => row(label, key)).join('');
+  const details = g.groups.map(([name, keys]) =>
+    `<tr class="group"><th colspan="${sel.length + 1}">${esc(name)}</th></tr>` + keys.map((k) => row(g.FIELD[k].label || g.FIELD[k].head, k)).join('')).join('');
+  const wasOpen = $('#moreDetails') ? $('#moreDetails').open : false;
+  $('#summary').innerHTML = `<div class="scroll"><table class="grid summary">${head}<tbody>${summary}</tbody></table></div>
+    <details class="more" id="moreDetails"${wasOpen ? ' open' : ''}><summary>All recorded values</summary>
+      <div class="scroll" style="margin-top:8px"><table class="grid summary">${head}<tbody>${details}</tbody></table></div></details>`;
+  renderCharts();
+}
+
+function renderCharts() {
+  const sel = picked(), g = G();
+  const box = $('#charts');
+  if (!sel.length) { box.innerHTML = ''; return; }
+  const ids = g.charts.map((c) => c.id).join(',');
+  if (box.dataset.ids !== ids || box.children.length !== g.charts.length) {
+    box.innerHTML = g.charts.map((c) => `<div class="chart" data-chart="${c.id}"></div>`).join('');
+    box.dataset.ids = ids;
+  }
+  for (const spec of g.charts) {
+    const el = box.querySelector(`[data-chart="${spec.id}"]`);
+    const width = Math.max(240, Math.floor(el.clientWidth - 24));
+    el.innerHTML = chartHtml(spec, sel, width);
+  }
+}
+
+function renderSortbar() {
+  const v = view();
+  $('#sortbar').innerHTML = '<span class="lbl">Sort by</span>' + G().sorts.map(([k, label]) => {
+    const on = v.sortKey === k;
+    return `<button class="sortbtn${on ? ' on' : ''}" data-sort="${k}" aria-pressed="${on}" title="Sort the list by ${esc(label.toLowerCase())}${on ? ' (click to reverse)' : ''}">${esc(label)}${on ? (v.sortDir > 0 ? ' ▲' : ' ▼') : ''}</button>`;
+  }).join('');
+}
+
+function sortedTests() {
+  const d = db(), v = view(), k = G().sorts.some(([s]) => s === v.sortKey) ? v.sortKey : G().dateKey, dir = v.sortDir;
+  const isDate = !!(G().FIELD[k] || {}).date;
+  // Blanks always go last, and so does text in a date column ("Not Tested").
+  const blank = (x) => x == null || String(x).trim() === '' || (isDate && !isNum(x));
+  return d.tests.map((t, n) => ({ t, n })).sort((a, b) => {
+    const va = a.t.v[k], vb = b.t.v[k];
+    if (blank(va) !== blank(vb)) return blank(va) ? 1 : -1;
+    let c = 0;
+    if (!blank(va)) c = isNum(va) && isNum(vb) ? va - vb : cmpKeys(naturalKey(va), naturalKey(vb));
+    if (c === 0) c = cmpKeys(naturalKey(a.t.label), naturalKey(b.t.label));
+    return c * dir || a.n - b.n;
+  }).map((x) => x.t);
+}
+
+function renderList() {
+  const g = G(), v = view(), d = db();
+  $('#listTitle').textContent = `${state.grade} test list`;
+  $('#filter').placeholder = g.placeholder;
+  if ($('#filter').value !== v.filter) $('#filter').value = v.filter;
+  $('#list thead tr').innerHTML = g.list.map(([, h]) => `<th>${esc(h)}</th>`).join('');
+  const q = v.filter.trim().toLowerCase();
+  const terms = q.split(/\s+/).filter(Boolean);
+  const slotOf = new Map(v.slots.map((l, i) => [l, i]).filter(([l]) => l));
+  const keys = [...g.list.map(([k]) => k), ...g.search];
+  const rows = sortedTests().filter((t) => !terms.length || terms.every((term) =>
+    t.label.toLowerCase().includes(term) || keys.some((k) => show(g, k, t.v[k]).toLowerCase().includes(term))));
+  const hl = (s) => {
+    let out = esc(s);
+    for (const term of terms) out = out.replace(new RegExp(esc(term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), (m) => `<mark>${m}</mark>`);
+    return out;
+  };
+  const shown = rows.slice(0, 2000);
+  $('#list tbody').innerHTML = shown.map((t) => {
+    const s = slotOf.get(t.label);
+    const mark = s != null ? `<span class="slotmark" style="background:${slotColor(s)}" title="Test ${s + 1}">${s + 1}</span>` : '';
+    return `<tr tabindex="0" data-label="${esc(t.label)}" class="${s != null ? 'picked' : ''}">${g.list.map(([k], ci) =>
+      `<td>${hl(k === 'test' ? t.label : show(g, k, t.v[k]))}${ci === 0 ? mark : ''}</td>`).join('')}</tr>`;
+  }).join('') || `<tr><td colspan="${g.list.length}" style="color:var(--muted);cursor:default">No tests match “${esc(v.filter)}”.</td></tr>`;
+  $('#listCount').textContent = rows.length === d.tests.length ? `${rows.length} tests` : `${rows.length} of ${d.tests.length}`;
+}
+
+/* ================================================================ actions */
+function setSlot(i, label) {
+  delete typedNow()[i];
+  view().slots[i] = label;
+  renderAll();
+}
+function pickFromList(label) {
+  const v = view(), tp = typedNow();
+  const at = v.slots.indexOf(label);
+  if (at >= 0) { v.slots[at] = ''; delete tp[at]; v.active = at; renderAll(); return; }
+  let i = v.active;
+  if (v.slots[i]) { const e = nextEmpty(i); i = e >= 0 ? e : i; }
+  delete tp[i];
+  v.slots[i] = label;
+  const e = nextEmpty(i);
+  v.active = e >= 0 ? e : i;
+  renderAll();
+}
+function commitInput(input) {
+  const i = +input.dataset.input, text = input.value.trim(), v = view(), tp = typedNow();
+  if (!text) { if (v.slots[i] || tp[i] != null) setSlot(i, ''); return; }
+  const t = testOf(text);
+  if (t) { if (t.label !== v.slots[i] || tp[i] != null) setSlot(i, t.label); }
+  else { tp[i] = text; v.slots[i] = ''; renderAll(); }
+}
+function setActive(i) {
+  view().active = i;
+  document.querySelectorAll('#slots .slot').forEach((s) => s.classList.toggle('active', +s.dataset.slot === i));
+}
+
+function csvCell(v) { const s = v == null ? '' : String(v); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }
+function exportCsv() {
+  const g = G(), sel = picked();
+  const tests = sel.length ? sel.map((x) => x.t) : db().tests;
+  const lines = [g.fields.map((f) => csvCell(f.head)).join(',')];
+  for (const t of tests) lines.push(g.fields.map((f) => csvCell(f.key === 'test' ? t.label : f.date && isNum(t.v[f.key]) ? showDate(t.v[f.key]) : t.v[f.key])).join(','));
+  const name = sel.length ? `${state.grade}_Comparison_${tests.map((t) => t.label.replace(/[^0-9A-Za-z-]+/g, '_')).join('_')}.csv` : `${state.grade}_Test_Data.csv`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv' }));
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
+let loading = false;
+async function openFile(file) {
+  if (loading) return;
+  loading = true;
+  $('#loadError').textContent = '';
+  const status = $('#status'), before = status.textContent;
+  status.classList.add('busy');
+  status.textContent = `Opening ${file.name}…`;
+  try {
+    const found = await loadFile(file, (msg) => { status.textContent = msg; });
+    for (const [g, d] of Object.entries(found)) {
+      state.dbs[g] = hydrate(d);
+      typed[g] = {};
+      const v = state.views[g];
+      // First time a grade is loaded: start with the tests chosen on its comparison sheet.
+      if (!v.slots.some((l) => testOf(l, g)) && d.preset) {
+        v.slots = d.preset.map((l) => (testOf(l, g) ? testOf(l, g).label : ''));
+        v.active = Math.max(0, v.slots.findIndex((l) => !l));
+      }
+      normaliseSlots(g);
+    }
+    if (!found[state.grade]) state.grade = Object.keys(found)[0];
+    status.classList.remove('busy');
+    renderAll();
+  } catch (e) {
+    status.classList.remove('busy');
+    status.textContent = before;
+    const msg = e && e.message ? e.message : String(e);
+    if (Object.keys(state.dbs).length) alert(`Could not load ${file.name}: ${msg}`); else $('#loadError').textContent = `Could not load ${file.name}: ${msg}`;
+  } finally {
+    loading = false;
+  }
+}
+
+/* ================================================================ events */
+$('#file').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) openFile(f); e.target.value = ''; });
+document.addEventListener('dragover', (e) => { if ([...e.dataTransfer.types].includes('Files')) { e.preventDefault(); document.body.classList.add('dragover'); } });
+document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) document.body.classList.remove('dragover'); });
+document.addEventListener('drop', (e) => {
+  document.body.classList.remove('dragover');
+  if (e.dataTransfer.files.length) { e.preventDefault(); openFile(e.dataTransfer.files[0]); }
+});
+
+$('#tabs').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-grade]');
+  if (b && !b.disabled && b.dataset.grade !== state.grade) { state.grade = b.dataset.grade; tip.hidden = true; renderAll(); }
+});
+$('#tabs').addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  const avail = GRADE_IDS.filter((g) => state.dbs[g]);
+  const next = avail[(avail.indexOf(state.grade) + (e.key === 'ArrowRight' ? 1 : avail.length - 1)) % avail.length];
+  if (next && next !== state.grade) { state.grade = next; renderAll(); document.querySelector(`[data-grade="${next}"]`).focus(); }
+});
+
+$('#slots').addEventListener('click', (e) => {
+  const clear = e.target.closest('[data-clear]');
+  if (clear) { const i = +clear.dataset.clear; view().active = i; setSlot(i, ''); return; }
+  const slot = e.target.closest('[data-slot]');
+  if (slot && +slot.dataset.slot !== view().active) setActive(+slot.dataset.slot);
+});
+$('#slots').addEventListener('focusin', (e) => { const inp = e.target.closest('[data-input]'); if (inp) setActive(+inp.dataset.input); });
+$('#slots').addEventListener('change', (e) => { const inp = e.target.closest('[data-input]'); if (inp) commitInput(inp); });
+$('#slots').addEventListener('keydown', (e) => {
+  const inp = e.target.closest('[data-input]');
+  if (inp && e.key === 'Enter') { e.preventDefault(); const i = +inp.dataset.input; commitInput(inp); const next = document.querySelector(`[data-input="${i + 1}"]`); if (next) next.focus(); }
+});
+$('#slots').addEventListener('input', (e) => {
+  // Choosing from the browser's suggestion list fires "input" with an exact match: apply it straight away.
+  const inp = e.target.closest('[data-input]');
+  if (inp && testOf(inp.value.trim()) && (e.inputType === 'insertReplacementText' || e.inputType == null)) commitInput(inp);
+});
+$('#addSlot').addEventListener('click', () => {
+  const v = view();
+  if (v.slots.length < MAX_SLOTS) { v.slots.push(''); v.active = v.slots.length - 1; renderAll(); document.querySelector(`[data-input="${v.active}"]`).focus(); }
+});
+$('#clearSlots').addEventListener('click', () => {
+  typed[state.grade] = {};
+  Object.assign(view(), { slots: Array(DEFAULT_SLOTS).fill(''), active: 0 });
+  renderAll();
+});
+
+$('#sortbar').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-sort]');
+  if (!b) return;
+  const v = view();
+  if (v.sortKey === b.dataset.sort) v.sortDir *= -1; else { v.sortKey = b.dataset.sort; v.sortDir = b.dataset.sort === G().dateKey ? -1 : 1; } // dates: newest first
+  renderSortbar(); renderList(); save();
+  $('#listWrap').scrollTop = 0;
+});
+$('#filter').addEventListener('input', (e) => { view().filter = e.target.value; renderList(); });
+$('#list').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-label]'); if (tr) pickFromList(tr.dataset.label); });
+$('#list').addEventListener('keydown', (e) => {
+  const tr = e.target.closest('tr[data-label]');
+  if (!tr) return;
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); const l = tr.dataset.label; pickFromList(l); const again = document.querySelector(`#list tr[data-label="${CSS.escape(l)}"]`); if (again) again.focus(); }
+  else if (e.key === 'ArrowDown' && tr.nextElementSibling) { e.preventDefault(); tr.nextElementSibling.focus(); }
+  else if (e.key === 'ArrowUp' && tr.previousElementSibling) { e.preventDefault(); tr.previousElementSibling.focus(); }
+});
+$('#forget').addEventListener('click', () => {
+  try { localStorage.removeItem(STORE_KEY); } catch (e) { /* ignore */ }
+  state.dbs = {};
+  state.views = Object.fromEntries(GRADE_IDS.map((g) => [g, freshView(g)]));
+  for (const g of GRADE_IDS) typed[g] = {};
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ }
+  renderAll();
+});
+$('#exportCsv').addEventListener('click', exportCsv);
+$('#print').addEventListener('click', () => window.print());
+window.addEventListener('hashchange', () => { readHash(); renderAll(); });
+
+// Tooltips on chart bars.
+const tip = $('#tip');
+$('#charts').addEventListener('mousemove', (e) => {
+  const hit = e.target.closest('.hit');
+  document.querySelectorAll('#charts .bar.on').forEach((b) => b.classList.remove('on'));
+  if (!hit) { tip.hidden = true; return; }
+  const d = JSON.parse(hit.dataset.tip);
+  const bar = hit.nextElementSibling;
+  if (bar && bar.classList.contains('bar')) bar.classList.add('on');
+  tip.innerHTML = `<b>${esc(d.t)}</b>${d.s ? ` · ${esc(d.s)}` : ''}<br>${esc(d.n)}: <span class="tv">${esc(d.v)}</span> ${d.v === 'no value' ? '' : esc(d.u)}`;
+  tip.hidden = false;
+  const r = tip.getBoundingClientRect();
+  let x = e.clientX + 14, y = e.clientY + 14;
+  if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 14;
+  if (y + r.height > innerHeight - 8) y = e.clientY - r.height - 14;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+});
+$('#charts').addEventListener('mouseleave', () => { tip.hidden = true; document.querySelectorAll('#charts .bar.on').forEach((b) => b.classList.remove('on')); });
+
+// Redraw charts at their new width when the window (or print layout) changes size.
+let resizeTimer = 0, lastW = 0;
+new ResizeObserver(() => {
+  const w = $('#charts').clientWidth;
+  if (Math.abs(w - lastW) < 2) return;
+  lastW = w;
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (db()) renderCharts(); }, 60);
+}).observe($('#charts'));
+window.addEventListener('beforeprint', () => { if (db()) renderCharts(); });
+window.addEventListener('resize', () => document.documentElement.style.setProperty('--bar-h', $('#appbar').offsetHeight + 'px'));
+
+restore();
+readHash();
+renderAll();
+</script>
+</body>
+</html>
