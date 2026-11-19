@@ -20,12 +20,17 @@ there exactly as before.
    and **never uploaded anywhere**. The first time, each grade starts with the five tests
    chosen on its comparison sheet.
 4. Switch between **234** and **634** at the top. Each grade keeps its own tests.
-5. Pick tests:
-   * Type a test number into a slot (*Test 1* to *Test 5*), or pick one from the
-     drop-down suggestions, the same as the *Choose Test # From Table* cells; or
-   * Click a test in the **test list** on the right to put it in the highlighted slot.
-     Click it again to take it out.
-   * **+ Add test** adds slots, up to 8 tests.
+5. Pick tests. **There is no limit**: compare as many as you like.
+   * Type a test number into a slot (*Test 1*, *Test 2* …), or pick one from the
+     drop-down suggestions, the same as the *Choose Test # From Table* cells. Press
+     **Enter** on the last slot to open another one.
+   * Paste or type several numbers into one slot (`26029 26030, 26031`) and press
+     **Enter**: they fill that slot and the ones after it, adding slots as needed.
+   * Click a test in the **test list** on the right to put it in the highlighted slot
+     (a new slot if they are all full). Click it again to take it out.
+   * Filter the test list and click **+ Add all shown** (or press **Enter** in the filter
+     box) to add every test shown, for example a whole lot or every test from `2026-09`.
+   * **+ Add test** adds an empty slot; **×** clears one; **Clear all** starts again.
 6. The test list starts with the newest tests first. Sort it with the buttons above it
    (click the same button again to reverse the order). The filter box searches the
    listed columns and the comments, for example `576`, `2026-10`, `footprinting` or `Failed`.
@@ -47,9 +52,9 @@ The grade and tests are also kept in the page address
 | **634**: test # = *Lot Num.* | Same. Each test shows its set number and testing status. |
 | 634: Set #, Bake, LSO | *Test details* table: Set #, Bake, LSO, Testing status, Comments. **All recorded values** expands to every column of `Grade_634_TestData`. |
 | 634 charts: Average Brush Life (hrs/in), Coefficient of Friction, Contact Voltage Drop (Volts) | Same three charts, in the same order. |
-| Five fixed test slots | Five slots, up to eight. |
+| Five fixed test slots | Any number of tests. With more than eight, the charts use the full width and scroll sideways when there's no room (printing fits them to the page). |
 
-Each test keeps its own colour in every chart. Hover over a bar to see the test and value.
+Each test keeps its own colour in every chart (the first eight use the usual palette, later ones get evenly spread colours). Hover over a bar to see the test and value.
 Values that are blank in the data (a failed or unfinished test) show as *n/a* instead of a
 zero-height bar.
 

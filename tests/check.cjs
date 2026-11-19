@@ -25,7 +25,7 @@ const { chromium } = require('playwright');
 
   // Both data sheets are read; placeholder rows ("Not Tested", "Format Line") are not tests;
   // the Control sheet with the same headings is ignored.
-  assert.deepEqual(await tabs(), ['2344 tests', '6346 tests']);
+  assert.deepEqual(await tabs(), ['23414 tests', '6346 tests']);
   assert.match(await page.textContent('#status'), /Grade_234_TestData/);
   assert.equal(await page.textContent('#reportTitle'), '234 Dummy Comm Testing');
 
@@ -50,13 +50,13 @@ const { chromium } = require('playwright');
   assert.equal(await page.textContent('[data-slot="3"] .sub'), 'Test not found');
 
   // The list starts newest first; sort buttons, a second click reverses.
-  assert.deepEqual(await col(0), ['26002 (2)', '26003', '26002', '26001']);
+  assert.deepEqual((await col(0)).slice(0, 5), ['26002 (2)', '26003', '26002', '26001', '25110']);
   await page.click('[data-sort="test"]');
-  assert.deepEqual(await col(0), ['26001', '26002', '26002 (2)', '26003']);
+  assert.deepEqual((await col(0)).slice(-4), ['26001', '26002', '26002 (2)', '26003']);
   await page.click('[data-sort="test"]');
-  assert.deepEqual(await col(0), ['26003', '26002 (2)', '26002', '26001']);
+  assert.deepEqual((await col(0)).slice(0, 4), ['26003', '26002 (2)', '26002', '26001']);
   await page.click('[data-sort="bake"]');
-  assert.deepEqual(await col(2), ['7001', '7003', 'L7002', 'L7002']);
+  assert.deepEqual((await col(2)).slice(-4), ['7001', '7003', 'L7002', 'L7002']);
   await page.fill('#filter', 'rerun');
   assert.deepEqual(await col(0), ['26002 (2)']);
 
@@ -101,12 +101,51 @@ const { chromium } = require('playwright');
   // A CSV of one data sheet replaces that grade only.
   await page.setInputFiles('#file', csv634);
   await page.waitForFunction(() => document.querySelector('#tabs').textContent.includes('7 tests'));
-  assert.deepEqual(await tabs(), ['2344 tests', '6347 tests']);
+  assert.deepEqual(await tabs(), ['23414 tests', '6347 tests']);
   assert.equal(await page.textContent('#reportTitle'), '634 Dummy Comm Testing');
   assert.deepEqual(await slots(), ['702', 'Trial', '703', '', '']);
   await page.click('[data-sort="date"]'); // CSV dates are text: they still sort as dates
   assert.deepEqual(await col(0), ['Trial', 'Trial (2)', '704', '667-A2', '701', '702', '703']);
   assert.equal(await page.$eval('#list tr[data-label="704"] td:nth-child(4)', (td) => td.textContent), '2016-07-01');
+
+  // Any number of tests: "+ Add all shown" adds the filtered list, past the five slots.
+  await page.click('[data-grade="234"]');
+  await page.fill('#filter', '2025-01');
+  assert.equal(await page.textContent('#addShown'), '+ Add all 10 shown');
+  await page.click('#addShown');
+  assert.equal((await slots()).filter(Boolean).length, 14);
+  assert.equal((await page.$$('#summary > .scroll thead th')).length, 15);
+  assert.equal((await vals('ringTemp')).length, 14);
+  assert.equal(await page.$eval('#charts', (c) => c.classList.contains('many')), true);
+  assert.match(await page.$eval('[data-slot="8"] .swatch', (e) => e.style.background), /^rgb/); // own colour past the 8-colour palette
+  assert.equal(await page.textContent('#addShown'), '+ Add all shown');
+  // Clearing the last slot removes it; clicking a test in the list when every slot is full adds a slot.
+  await page.fill('#filter', '');
+  assert.equal((await slots()).length, 14);
+  await page.click('[data-clear="13"]');
+  assert.equal((await slots()).length, 13);
+  await page.click('#list tr[data-label="25110"]');
+  assert.equal((await slots()).length, 14);
+  assert.deepEqual((await slots()).slice(-1), ['25110']);
+  // On a narrow screen a crowded chart scrolls sideways instead of squeezing the bars.
+  await page.setViewportSize({ width: 480, height: 900 });
+  await page.waitForFunction(() => document.querySelector('[data-chart="ringTemp"] .hscroll'));
+  await page.setViewportSize({ width: 1400, height: 900 });
+
+  // Pasting several test numbers into a slot fills it and the following slots; unknown ones are flagged.
+  await page.click('#clearSlots');
+  await page.fill('[data-input="0"]', '25101, 25102 25103 99999');
+  await page.press('[data-input="0"]', 'Enter');
+  assert.deepEqual(await slots(), ['25101', '25102', '25103', '99999', '']);
+  assert.equal(await page.textContent('[data-slot="3"] .sub'), 'Test not found');
+  // Enter on a filled last slot opens another one.
+  await page.fill('[data-input="4"]', '25104');
+  await page.press('[data-input="4"]', 'Enter');
+  assert.deepEqual(await slots(), ['25101', '25102', '25103', '99999', '25104', '']);
+  assert.equal(await page.evaluate(() => document.activeElement.dataset.input), '5');
+  // Clearing the last slots removes the empty ones beyond the first five.
+  await page.click('[data-clear="4"]');
+  assert.equal((await slots()).length, 5);
 
   // Forget saved data returns to the start screen.
   await page.click('#forget');

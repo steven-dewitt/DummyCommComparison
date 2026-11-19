@@ -40,6 +40,9 @@ ROWS_234 = [
     r234(26002, 502, 'L7002', dt.datetime(2026, 2, 5), dt.datetime(2026, 2, 20), 75, 12295, '=AVERAGE(0.07,0.08)', 1.91),
     r234(26003, 503, 7003, dt.datetime(2026, 3, 5), None, None, None, None, None, 'not run yet'),
     r234(26002, 502, 'L7002', dt.datetime(2026, 4, 5), dt.datetime(2026, 4, 20), 80, 4257, 0.103, 2.03, 'rerun'),
+    # Lot 600: ten older tests, to compare more than eight at once.
+    *[r234(25100 + n, 600, 6000 + n, dt.datetime(2025, 1, n), dt.datetime(2025, 2, n), 70 + n, 2000 + 100 * n, 0.06, 2.0)
+      for n in range(1, 11)],
     ['Not Tested', None, 'Not Tested', 254, 'M8515', 'Not Tested'] + [None] * 30 + [234],
     ['Format Line'] + [None] * 35 + [234],
 ]

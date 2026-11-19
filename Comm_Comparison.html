@@ -122,6 +122,10 @@ details.more summary { cursor: pointer; color: var(--accent); font-weight: 600; 
 .chart h3 { font-size: 15px; text-align: center; }
 .chart .empty { color: var(--muted); text-align: center; padding: 40px 10px; font-size: 13px; }
 .chart svg { display: block; width: 100%; height: auto; overflow: visible; margin-top: 6px; }
+.charts.many { grid-template-columns: minmax(0, 1fr); }
+.chart .hscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.chart .hscroll svg { width: auto; max-width: none; }
+.listbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
 .chart svg text { font-family: inherit; fill: var(--ink-2); }
 .chart svg .tick { font-size: 11px; fill: var(--muted); }
 .chart svg .axtitle { font-size: 12px; font-weight: 600; fill: var(--ink-2); }
@@ -185,6 +189,10 @@ body.dragover .dropzone, body.dragover main { outline: 3px dashed var(--accent);
   html, body { background: #fff; color: #000; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .charts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .charts.many { grid-template-columns: minmax(0, 1fr); }
+  .chart .hscroll { overflow: visible; }
+  .chart .hscroll svg { width: 100%; }
+  .listbar { display: none; }
   .appbar .actions, .tabs, aside, .slotbar, .no-print, .slot .x { display: none !important; }
   .appbar { position: static; background: #fff; border: 0; padding: 0 0 8px; }
   .layout { display: block; }
@@ -219,7 +227,7 @@ body.dragover .dropzone, body.dragover main { outline: 3px dashed var(--accent);
     <section>
       <div class="sectionhead">
         <h2>Choose tests</h2>
-        <span class="hint no-print" style="margin:0">Type a test no. or pick from the list · click a test in the list to fill the highlighted slot</span>
+        <span class="hint no-print" style="margin:0">Type or paste test numbers, or click tests in the list · add as many as you like</span>
       </div>
       <datalist id="testIds"></datalist>
       <div class="slots" id="slots"></div>
@@ -243,7 +251,10 @@ body.dragover .dropzone, body.dragover main { outline: 3px dashed var(--accent);
 
   <aside>
     <h2><span id="listTitle">Test list</span> <span class="count" id="listCount"></span></h2>
-    <input class="field" id="filter" type="search" autocomplete="off" spellcheck="false" style="margin-top:8px">
+    <input class="field" id="filter" type="search" autocomplete="off" spellcheck="false" style="margin-top:8px"
+      title="Press Enter to add every test shown">
+    <div class="listbar"><button class="btn small" id="addShown" title="Add every test in the list below (Enter in the filter box does the same)">+ Add all shown</button>
+      <span class="hint" id="addShownHint" style="margin:0"></span></div>
     <div class="sortbar" id="sortbar"><span class="lbl">Sort by</span></div>
     <div class="tablewrap" id="listWrap">
       <table class="list" id="list">
@@ -275,7 +286,8 @@ body.dragover .dropzone, body.dragover main { outline: 3px dashed var(--accent);
 
 /* ============================================================ definitions */
 const STORE_KEY = 'comm-compare-v1';
-const DEFAULT_SLOTS = 5, MAX_SLOTS = 8;
+const DEFAULT_SLOTS = 5;
+const MANY = 8; // above this many tests the charts go full width
 
 // Placeholder rows in the data sheets that are not tests.
 const NOT_A_TEST = /^(not tested|format line)$/i;
@@ -419,7 +431,8 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 const normHead = (v) => String(v ?? '').toLowerCase().replace(/[^0-9a-z]/g, '');
 const ERROR_TEXT = /^#(N\/A|REF!|VALUE!|DIV\/0!|NAME\?|NUM!|NULL!|SPILL!|CALC!)$/i;
-const slotColor = (i) => `var(--s${i + 1})`;
+// The first eight tests use the palette; later ones get evenly spread hues (golden angle).
+const slotColor = (i) => (i < 8 ? `var(--s${i + 1})` : `hsl(${Math.round((i * 137.508 + 20) % 360)} 62% 48%)`);
 const pad2 = (n) => String(n).padStart(2, '0');
 const fmtDate = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 /** An Excel date serial as yyyy-mm-dd (text dates are shown as written). */
@@ -711,7 +724,7 @@ function hydrate(db) {
 function readPreset(rows) {
   for (const { cells } of rows) {
     if (typeof cells[0] === 'string' && /choose\s+test/i.test(cells[0]))
-      return cells.slice(1, 1 + MAX_SLOTS).map((v) => (v == null ? '' : String(v).trim()));
+      return cells.slice(1).map((v) => (v == null ? '' : String(v).trim()));
   }
   return null;
 }
@@ -801,7 +814,7 @@ function readHash() {
   if (tests == null || !db()) return;
   const labels = tests.split(',').map((s) => s.trim());
   if (!labels.some((l) => testOf(l))) return;
-  view().slots = labels.slice(0, MAX_SLOTS).map((l) => (testOf(l) ? testOf(l).label : ''));
+  view().slots = labels.map((l) => (testOf(l) ? testOf(l).label : ''));
   normaliseSlots();
 }
 function writeHash() {
@@ -896,11 +909,12 @@ function columnChart(width, groups, spec) {
   return `<svg viewBox="0 0 ${width} ${H}" role="img" aria-label="${esc(spec.title)}">${parts.join('')}</svg>`;
 }
 
-function chartHtml(spec, sel, width) {
+function chartHtml(spec, sel, width, scroll) {
   const g = G();
   const groups = sel.map(({ i, t }) => ({ label: t.label, sub: g.chartSub(t.v), v: t.v[spec.key], slot: i, test: t }));
-  const body = groups.some((x) => isNum(x.v)) ? columnChart(width, groups, { ...spec, x: g.xTitle })
+  let body = groups.some((x) => isNum(x.v)) ? columnChart(width, groups, { ...spec, x: g.xTitle })
     : '<div class="empty">No values recorded for these tests.</div>';
+  if (scroll && body.startsWith('<svg')) body = `<div class="hscroll">${body.replace('<svg ', `<svg width="${width}" height="300" `)}</div>`;
   return `<h3>${esc(spec.title)}</h3>${body}`;
 }
 
@@ -948,7 +962,6 @@ function renderSlots() {
       <div class="sub${bad ? ' err' : ''}">${esc(sub)}</div>
     </div>`;
   }).join('');
-  $('#addSlot').disabled = v.slots.length >= MAX_SLOTS;
   $('#clearSlots').disabled = !v.slots.some(Boolean) && !Object.keys(tp).length;
 }
 
@@ -999,10 +1012,12 @@ function renderCharts() {
     box.innerHTML = g.charts.map((c) => `<div class="chart" data-chart="${c.id}"></div>`).join('');
     box.dataset.ids = ids;
   }
+  box.classList.toggle('many', sel.length > MANY);
   for (const spec of g.charts) {
     const el = box.querySelector(`[data-chart="${spec.id}"]`);
-    const width = Math.max(240, Math.floor(el.clientWidth - 24));
-    el.innerHTML = chartHtml(spec, sel, width);
+    // Keep at least 30px per test; wider than the box, the chart scrolls sideways.
+    const fit = Math.max(240, Math.floor(el.clientWidth - 24)), need = 90 + sel.length * 30;
+    el.innerHTML = chartHtml(spec, sel, Math.max(fit, need), need > fit);
   }
 }
 
@@ -1029,6 +1044,7 @@ function sortedTests() {
   }).map((x) => x.t);
 }
 
+let shownLabels = [];
 function renderList() {
   const g = G(), v = view(), d = db();
   $('#listTitle').textContent = `${state.grade} test list`;
@@ -1054,6 +1070,11 @@ function renderList() {
       `<td>${hl(k === 'test' ? t.label : show(g, k, t.v[k]))}${ci === 0 ? mark : ''}</td>`).join('')}</tr>`;
   }).join('') || `<tr><td colspan="${g.list.length}" style="color:var(--muted);cursor:default">No tests match “${esc(v.filter)}”.</td></tr>`;
   $('#listCount').textContent = rows.length === d.tests.length ? `${rows.length} tests` : `${rows.length} of ${d.tests.length}`;
+  shownLabels = rows.map((t) => t.label);
+  const toAdd = shownLabels.filter((l) => !slotOf.has(l)).length;
+  $('#addShown').disabled = !toAdd;
+  $('#addShown').textContent = toAdd ? `+ Add all ${toAdd} shown` : '+ Add all shown';
+  $('#addShownHint').textContent = terms.length ? '' : 'Filter first to add a group, e.g. a lot or a date like 2026-09';
 }
 
 /* ================================================================ actions */
@@ -1067,7 +1088,7 @@ function pickFromList(label) {
   const at = v.slots.indexOf(label);
   if (at >= 0) { v.slots[at] = ''; delete tp[at]; v.active = at; renderAll(); return; }
   let i = v.active;
-  if (v.slots[i]) { const e = nextEmpty(i); i = e >= 0 ? e : i; }
+  if (v.slots[i]) { const e = nextEmpty(i); i = e >= 0 ? e : v.slots.push('') - 1; }
   delete tp[i];
   v.slots[i] = label;
   const e = nextEmpty(i);
@@ -1077,9 +1098,40 @@ function pickFromList(label) {
 function commitInput(input) {
   const i = +input.dataset.input, text = input.value.trim(), v = view(), tp = typedNow();
   if (!text) { if (v.slots[i] || tp[i] != null) setSlot(i, ''); return; }
+  const tokens = text.split(/[\s,;]+/).filter(Boolean);
+  if (tokens.length > 1 && !testOf(text)) { v.slots[i] = ''; delete tp[i]; addTests(tokens, i); return; }
   const t = testOf(text);
   if (t) { if (t.label !== v.slots[i] || tp[i] != null) setSlot(i, t.label); }
   else { tp[i] = text; v.slots[i] = ''; renderAll(); }
+}
+/** Put tests (labels or typed numbers) into the empty slots from `from` on, adding slots as needed. */
+function addTests(labels, from = 0) {
+  const v = view(), tp = typedNow();
+  const have = new Set(v.slots.filter(Boolean));
+  const found = [], unknown = [];
+  for (const l of labels) {
+    const t = testOf(l);
+    if (!t) unknown.push(l); else if (!have.has(t.label)) { have.add(t.label); found.push(t.label); }
+  }
+  let i = from;
+  for (const label of found) {
+    while (i < v.slots.length && v.slots[i]) i++;
+    if (i >= v.slots.length) v.slots.push('');
+    delete tp[i];
+    v.slots[i++] = label;
+  }
+  if (unknown.length) { const j = nextEmpty(i) >= 0 ? nextEmpty(i) : v.slots.push('') - 1; tp[j] = unknown.join(' '); }
+  const e = nextEmpty(i);
+  v.active = e >= 0 ? e : v.slots.length - 1;
+  renderAll();
+  return found.length;
+}
+/** "+ Add all shown": every test in the (filtered) list that isn't already compared. */
+function addShown() {
+  const labels = shownLabels.filter((l) => !view().slots.includes(l));
+  if (!labels.length) return;
+  if (labels.length > 50 && !confirm(`Add ${labels.length} tests to the comparison?`)) return;
+  addTests(labels, nextEmpty(0) >= 0 ? nextEmpty(0) : view().slots.length);
 }
 function setActive(i) {
   view().active = i;
@@ -1092,7 +1144,8 @@ function exportCsv() {
   const tests = sel.length ? sel.map((x) => x.t) : db().tests;
   const lines = [g.fields.map((f) => csvCell(f.head)).join(',')];
   for (const t of tests) lines.push(g.fields.map((f) => csvCell(f.key === 'test' ? t.label : f.date && isNum(t.v[f.key]) ? showDate(t.v[f.key]) : t.v[f.key])).join(','));
-  const name = sel.length ? `${state.grade}_Comparison_${tests.map((t) => t.label.replace(/[^0-9A-Za-z-]+/g, '_')).join('_')}.csv` : `${state.grade}_Test_Data.csv`;
+  const name = !sel.length ? `${state.grade}_Test_Data.csv` : tests.length > MANY ? `${state.grade}_Comparison_${tests.length}_tests.csv`
+    : `${state.grade}_Comparison_${tests.map((t) => t.label.replace(/[^0-9A-Za-z-]+/g, '_')).join('_')}.csv`;
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv' }));
   a.download = name;
@@ -1157,7 +1210,16 @@ $('#tabs').addEventListener('keydown', (e) => {
 
 $('#slots').addEventListener('click', (e) => {
   const clear = e.target.closest('[data-clear]');
-  if (clear) { const i = +clear.dataset.clear; view().active = i; setSlot(i, ''); return; }
+  if (clear) {
+    const i = +clear.dataset.clear, v = view();
+    delete typedNow()[i];
+    v.slots[i] = '';
+    // Drop empty slots at the end (beyond the first five) so the grid doesn't fill with blanks.
+    while (v.slots.length > DEFAULT_SLOTS && !v.slots[v.slots.length - 1] && typedNow()[v.slots.length - 1] == null) v.slots.pop();
+    v.active = Math.min(i, v.slots.length - 1);
+    renderAll();
+    return;
+  }
   const slot = e.target.closest('[data-slot]');
   if (slot && +slot.dataset.slot !== view().active) setActive(+slot.dataset.slot);
 });
@@ -1165,7 +1227,15 @@ $('#slots').addEventListener('focusin', (e) => { const inp = e.target.closest('[
 $('#slots').addEventListener('change', (e) => { const inp = e.target.closest('[data-input]'); if (inp) commitInput(inp); });
 $('#slots').addEventListener('keydown', (e) => {
   const inp = e.target.closest('[data-input]');
-  if (inp && e.key === 'Enter') { e.preventDefault(); const i = +inp.dataset.input; commitInput(inp); const next = document.querySelector(`[data-input="${i + 1}"]`); if (next) next.focus(); }
+  if (inp && e.key === 'Enter') {
+    e.preventDefault();
+    const i = +inp.dataset.input, v = view();
+    commitInput(inp);
+    // Enter on a filled last slot opens a new one, so tests can be typed one after another.
+    if (i === v.slots.length - 1 && v.slots[i]) { v.slots.push(''); v.active = i + 1; renderAll(); }
+    const next = document.querySelector(`[data-input="${i + 1}"]`);
+    if (next) next.focus();
+  }
 });
 $('#slots').addEventListener('input', (e) => {
   // Choosing from the browser's suggestion list fires "input" with an exact match: apply it straight away.
@@ -1174,7 +1244,7 @@ $('#slots').addEventListener('input', (e) => {
 });
 $('#addSlot').addEventListener('click', () => {
   const v = view();
-  if (v.slots.length < MAX_SLOTS) { v.slots.push(''); v.active = v.slots.length - 1; renderAll(); document.querySelector(`[data-input="${v.active}"]`).focus(); }
+  v.slots.push(''); v.active = v.slots.length - 1; renderAll(); document.querySelector(`[data-input="${v.active}"]`).focus();
 });
 $('#clearSlots').addEventListener('click', () => {
   typed[state.grade] = {};
@@ -1191,6 +1261,8 @@ $('#sortbar').addEventListener('click', (e) => {
   $('#listWrap').scrollTop = 0;
 });
 $('#filter').addEventListener('input', (e) => { view().filter = e.target.value; renderList(); });
+$('#filter').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addShown(); } });
+$('#addShown').addEventListener('click', addShown);
 $('#list').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-label]'); if (tr) pickFromList(tr.dataset.label); });
 $('#list').addEventListener('keydown', (e) => {
   const tr = e.target.closest('tr[data-label]');
