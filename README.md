@@ -34,8 +34,10 @@ there exactly as before.
 6. The test list starts with the newest tests first. Sort it with the buttons above it
    (click the same button again to reverse the order). The filter box searches the
    listed columns and the comments, for example `576`, `2026-10`, `footprinting` or `Failed`.
-7. **Print / PDF** prints the comparison (landscape). **⬇ CSV** saves every recorded value
-   for the selected tests.
+7. **Print / PDF** prints the comparison (landscape), however many tests are in it:
+   *Test details* (one row per test), then *All recorded values* if it's open, then the
+   charts. The test slots aren't printed, since *Test details* lists every test.
+   **⬇ CSV** saves every recorded value for the selected tests.
 
 The page remembers the data and the selected tests on that computer, so next time it
 opens ready to go. Click **Open data file…** again after adding tests to the workbook.
@@ -47,12 +49,15 @@ The grade and tests are also kept in the page address
 | Workbook | Browser version |
 |---|---|
 | **234**: test # = *Set Number* | Same. Each test shows its lot and test date. |
-| 234: Grade, Bake, LSO Number | *Test details* table: Grade, Lot, Bake, LSO Number, Comments. **All recorded values** expands to every column of `Grade_234_TestData` (modified friction testing and comm testing). |
+| 234: Grade, Bake, LSO Number | *Test details*: one row per test with Grade, Lot, Bake, LSO Number, the three charted results and Comments. **All recorded values** shows every column of `Grade_234_TestData`, in a table per group (Test, Modified friction testing, Dummy commutator testing). |
 | 234 charts: Ring Temp °C, Brush Life (Hrs/in), Coef. Of Friction | Same three charts, same number formats. Each bar is labelled with the set number and lot. |
 | **634**: test # = *Lot Num.* | Same. Each test shows its set number and testing status. |
-| 634: Set #, Bake, LSO | *Test details* table: Set #, Bake, LSO, Testing status, Comments. **All recorded values** expands to every column of `Grade_634_TestData`. |
+| 634: Set #, Bake, LSO | *Test details*: one row per test with Set #, Bake, LSO, Testing status, the three charted results and Comments. **All recorded values** shows every column of `Grade_634_TestData`, in a table per group (Test, Conditions, Results). |
 | 634 charts: Average Brush Life (hrs/in), Coefficient of Friction, Contact Voltage Drop (Volts) | Same three charts, in the same order. |
 | Five fixed test slots | Any number of tests. With more than eight, the charts use the full width and scroll sideways when there's no room (printing fits them to the page). |
+
+With more than eight tests, each group in *All recorded values* is split into blocks of eight tests
+("tests 9–16 of 28"), so every table fits the page width and doesn't split across printed pages.
 
 Each test keeps its own colour in every chart (the first eight use the usual palette, later ones get evenly spread colours). Hover over a bar to see the test and value.
 Values that are blank in the data (a failed or unfinished test) show as *n/a* instead of a

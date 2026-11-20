@@ -19,7 +19,9 @@ const { chromium } = require('playwright');
 
   const tabs = () => page.$$eval('#tabs .tab', (t) => t.map((x) => x.textContent));
   const slots = () => page.$$eval('[data-input]', (e) => e.map((x) => x.value));
-  const summary = () => page.$$eval('#summary > .scroll tr', (rows) => rows.map((r) => Array.from(r.children).map((c) => c.textContent.trim())));
+  // Test details: one row per test (after the two header rows).
+  const summary = () => page.$$eval('#summary table.details tr', (rows) => rows.map((r) => Array.from(r.children).map((c) => c.textContent.trim())));
+  const valueTables = () => page.$$eval('#summary table.values', (ts) => ts.map((t) => t.caption.textContent));
   const vals = (id) => page.$$eval(`[data-chart="${id}"] text.val, [data-chart="${id}"] text.na`, (t) => t.map((x) => x.textContent));
   const col = (n) => page.$$eval('#list tbody tr', (rows, n) => rows.map((r) => r.children[n].firstChild.textContent), n);
 
@@ -32,9 +34,13 @@ const { chromium } = require('playwright');
   // Starts with the tests chosen on 234Comparison (99999 isn't in the data, so that slot is empty).
   assert.deepEqual(await slots(), ['26001', '', '26002', '', '']);
   assert.deepEqual(await summary(), [
-    ['Set #', '26001', '26002'], ['Grade', '234', '234'], ['Lot', '501', '502'], ['Bake', '7001', 'L7002'],
-    ['LSO Number', '2026001', ''], ['Comments', '', ''],
+    ['Set #', 'Test', 'Results', 'Comments'],
+    ['Grade', 'Lot', 'Bake', 'LSO Number', 'Ring Temp °C', 'Brush Life (Hrs/in)', 'Coef. Of Friction'],
+    ['26001', '234', '501', '7001', '2026001', '73', '2,481', '0.065', ''],
+    ['26002', '234', '502', 'L7002', '', '75', '12,295', '0.075', ''],
   ]);
+  // All recorded values: a table per group of fields.
+  assert.deepEqual(await valueTables(), ['Test', 'Modified friction testing', 'Dummy commutator testing']);
   assert.deepEqual(await page.$$eval('.chart h3', (h) => h.map((x) => x.textContent)), ['Ring Temp °C', 'Brush Life (Hrs/in)', 'Coef. Of Friction']);
   assert.deepEqual(await vals('ringTemp'), ['73', '75']);
   assert.deepEqual(await vals('life'), ['2,481', '12,295']);
@@ -71,9 +77,10 @@ const { chromium } = require('playwright');
   await page.click('[data-grade="634"]');
   assert.equal(await page.textContent('#reportTitle'), '634 Dummy Comm Testing');
   assert.deepEqual(await slots(), ['702', 'Trial', '', '', '']);
-  assert.deepEqual((await summary()).slice(0, 5), [
-    ['Test # (Lot)', '702', 'Trial'], ['Set #', '15008', '17112'], ['Bake', '4431', 'TG761'], ['LSO', '2014606', '2017250'],
-    ['Testing status', 'Complete', 'Complete'],
+  assert.deepEqual((await summary()).slice(1), [
+    ['Set #', 'Bake', 'LSO', 'Testing status', 'Average Brush Life (hrs/in)', 'Coefficient of Friction', 'Contact Voltage Drop (Volts)'],
+    ['702', '15008', '4431', '2014606', 'Complete', '8,711', '0.1600', '4.04', ''],
+    ['Trial', '17112', 'TG761', '2017250', 'Complete', '2,211', '0.3970', '2.40', ''],
   ]);
   assert.deepEqual(await page.$$eval('.chart h3', (h) => h.map((x) => x.textContent)),
     ['Average Brush Life (hrs/in)', 'Coefficient of Friction', 'Contact Voltage Drop (Volts)']);
@@ -114,7 +121,13 @@ const { chromium } = require('playwright');
   assert.equal(await page.textContent('#addShown'), '+ Add all 10 shown');
   await page.click('#addShown');
   assert.equal((await slots()).filter(Boolean).length, 14);
-  assert.equal((await page.$$('#summary > .scroll thead th')).length, 15);
+  // Every test is in Test details, whatever the number (one row each).
+  assert.deepEqual((await summary()).slice(2).map((r) => r[0]), await page.$$eval('[data-input]', (e) => e.map((x) => x.value).filter(Boolean)));
+  // All recorded values: each group in blocks of 8 tests.
+  assert.deepEqual(await valueTables(), ['Test · tests 1–8 of 14', 'Test · tests 9–14 of 14',
+    'Modified friction testing · tests 1–8 of 14', 'Modified friction testing · tests 9–14 of 14',
+    'Dummy commutator testing · tests 1–8 of 14', 'Dummy commutator testing · tests 9–14 of 14']);
+  assert.equal(await page.$$eval('#summary table.values', (ts) => ts.every((t) => t.tHead.rows[0].cells.length === 9)), true);
   assert.equal((await vals('ringTemp')).length, 14);
   assert.equal(await page.$eval('#charts', (c) => c.classList.contains('many')), true);
   assert.match(await page.$eval('[data-slot="8"] .swatch', (e) => e.style.background), /^rgb/); // own colour past the 8-colour palette

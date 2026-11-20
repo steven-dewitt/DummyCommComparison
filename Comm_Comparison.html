@@ -108,9 +108,27 @@ table.grid th, table.grid td { border: 1px solid var(--line); padding: 5px 8px; 
 table.grid thead th { background: var(--accent); color: var(--accent-ink); font-weight: 600; white-space: nowrap; }
 table.grid tbody th { background: var(--panel); font-weight: 600; white-space: nowrap; }
 table.grid td.num { text-align: right; white-space: nowrap; }
-table.summary td { min-width: 110px; font-weight: 600; }
-table.summary td.comments { font-weight: 400; min-width: 150px; }
-table.summary tr.group th { background: transparent; border-left: 0; border-right: 0; padding-top: 12px; color: var(--muted);
+table.grid td.na { color: var(--muted); font-style: italic; }
+table.grid thead th.num { text-align: right; }
+/* Test details: one row per test */
+table.details thead th { white-space: normal; vertical-align: bottom; }
+table.details thead tr.band th { text-align: center; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; vertical-align: middle;
+  border-bottom-color: rgba(255,255,255,.35); }
+table.details thead tr.band th:first-child, table.details thead tr.band th.comments { text-align: left; vertical-align: bottom; }
+table.details td { font-weight: 600; white-space: nowrap; }
+table.details td.comments, table.values td.comments { font-weight: 400; white-space: normal; min-width: 200px; }
+table.details tbody tr:nth-child(even) td { background: var(--surface); }
+/* All recorded values: blocks of up to 8 tests */
+.block { margin-top: 14px; }
+table.values caption { text-align: left; font-weight: 700; color: var(--ink-2); padding: 2px 0 6px; caption-side: top;
+  font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+table.values caption span { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--muted); }
+table.values { table-layout: fixed; } /* same column widths in every group, so they line up */
+table.values th:first-child { width: 190px; }
+table.values td { overflow-wrap: anywhere; }
+table.values td.comments { min-width: 0; }
+table.values .pad { background: transparent !important; border-color: transparent !important; }
+table.values tr.group th { background: transparent; border-left: 0; border-right: 0; padding-top: 12px; color: var(--muted);
   font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
 details.more { margin-top: 10px; }
 details.more summary { cursor: pointer; color: var(--accent); font-weight: 600; }
@@ -197,8 +215,17 @@ body.dragover .dropzone, body.dragover main { outline: 3px dashed var(--accent);
   .appbar { position: static; background: #fff; border: 0; padding: 0 0 8px; }
   .layout { display: block; }
   main { padding: 0; }
-  .slot { break-inside: avoid; }
-  .slot input { border: 0; padding: 0; background: none; }
+  /* The Test details table lists every test, so the slot cards aren't printed. */
+  #chooseSection .sectionhead, #slots { display: none; }
+  #chooseSection { margin: 0; }
+  table.grid { font-size: 11px; }
+  table.grid th, table.grid td { padding: 3px 6px; }
+  table.grid tr { break-inside: avoid; }
+  .block { break-inside: avoid; }
+  .sectionhead { break-after: avoid; }
+  details.more summary { list-style: none; color: #000; font-size: 15px; margin-top: 14px; break-after: avoid; }
+  details.more summary::-webkit-details-marker { display: none; }
+  table.values caption { break-after: avoid; }
   .chart { break-inside: avoid; }
   .scroll { overflow: visible; }
   details.more:not([open]) { display: none; }
@@ -224,7 +251,7 @@ body.dragover .dropzone, body.dragover main { outline: 3px dashed var(--accent);
 <div class="layout" id="layout" hidden>
   <main id="main">
     <h2 class="reporttitle" id="reportTitle"></h2>
-    <section>
+    <section id="chooseSection">
       <div class="sectionhead">
         <h2>Choose tests</h2>
         <span class="hint no-print" style="margin:0">Type or paste test numbers, or click tests in the list · add as many as you like</span>
@@ -977,6 +1004,8 @@ function renderNotices() {
   $('#notices').innerHTML = out.map((m) => `<div class="notice">${m}</div>`).join('');
 }
 
+const BLOCK = 8; // tests per "All recorded values" table, so each one fits a printed page
+
 function renderReport() {
   const sel = picked(), g = G();
   if (!sel.length) {
@@ -984,22 +1013,44 @@ function renderReport() {
     $('#charts').innerHTML = '';
     return;
   }
-  const head = `<thead><tr><th>${esc(g.testHead)}</th>${sel.map(({ i, t }) => `<th><i class="swatch" style="background:${slotColor(i)}"></i>${esc(t.label)}</th>`).join('')}</tr></thead>`;
-  const row = (label, key) => {
+  const cell = (key, v, cls = '') => {
     const f = g.FIELD[key];
-    const cls = key === 'comments' ? 'comments' : '';
-    return `<tr><th>${esc(label)}</th>${sel.map(({ t }) => {
-      const v = t.v[key];
-      return `<td class="${isNum(v) && !f.id && !f.date ? 'num' : ''} ${cls}">${esc(show(g, key, v))}</td>`;
-    }).join('')}</tr>`;
+    return `<td class="${isNum(v) && !f.id && !f.date ? 'num' : ''} ${cls}">${esc(show(g, key, v))}</td>`;
   };
-  const summary = g.summary.map(([label, key]) => row(label, key)).join('');
-  const details = g.groups.map(([name, keys]) =>
-    `<tr class="group"><th colspan="${sel.length + 1}">${esc(name)}</th></tr>` + keys.map((k) => row(g.FIELD[k].label || g.FIELD[k].head, k)).join('')).join('');
+  const swatchLabel = (i, t) => `<i class="swatch" style="background:${slotColor(i)}"></i>${esc(t.label)}`;
+
+  // Test details: one row per test, so any number of tests fits (and prints) without being cut off.
+  // Columns: the comparison sheet's rows, the three charted results (as the charts show them), then comments.
+  const info = g.summary.filter(([, k]) => k !== 'comments');
+  const results = g.charts;
+  const head = `<thead>
+      <tr class="band"><th rowspan="2">${esc(g.testHead)}</th><th colspan="${info.length}">Test</th>
+        <th colspan="${results.length}">Results</th><th rowspan="2" class="comments">Comments</th></tr>
+      <tr>${info.map(([l]) => `<th>${esc(l)}</th>`).join('')}${results.map((c) => `<th class="num">${esc(c.title)}</th>`).join('')}</tr>
+    </thead>`;
+  const rows = sel.map(({ i, t }) => `<tr><th>${swatchLabel(i, t)}</th>${info.map(([, k]) => cell(k, t.v[k])).join('')}${
+    results.map((c) => { const v = t.v[c.key]; return isNum(v) ? `<td class="num">${esc(fmtNum(v, c.dp, c.sep))}</td>` : '<td class="num na">n/a</td>'; }).join('')
+  }${cell('comments', t.v.comments, 'comments')}</tr>`).join('');
+
+  // All recorded values: a table per group of fields (as on the data sheet), each in blocks of BLOCK tests,
+  // so every table fits the page width and is short enough not to split across printed pages.
+  const blocks = [], many = sel.length > BLOCK;
+  for (const [name, keys] of g.groups) {
+    for (let b = 0; b < sel.length; b += BLOCK) {
+      const part = sel.slice(b, b + BLOCK);
+      const pad = many ? '<td class="pad"></td>'.repeat(BLOCK - part.length) : '';
+      const bhead = `<thead><tr><th>${esc(g.testHead)}</th>${part.map(({ i, t }) => `<th>${swatchLabel(i, t)}</th>`).join('')}${pad.replace(/td/g, 'th')}</tr></thead>`;
+      const body = keys.map((k) => `<tr><th>${esc(g.FIELD[k].label || g.FIELD[k].head)}</th>${
+        part.map(({ t }) => cell(k, t.v[k], k === 'comments' ? 'comments' : '')).join('')}${pad}</tr>`).join('');
+      const caption = `<caption>${esc(name)}${many ? ` <span>· tests ${b + 1}–${b + part.length} of ${sel.length}</span>` : ''}</caption>`;
+      blocks.push(`<div class="scroll block"><table class="grid values">${caption}${bhead}<tbody>${body}</tbody></table></div>`);
+    }
+  }
+
   const wasOpen = $('#moreDetails') ? $('#moreDetails').open : false;
-  $('#summary').innerHTML = `<div class="scroll"><table class="grid summary">${head}<tbody>${summary}</tbody></table></div>
-    <details class="more" id="moreDetails"${wasOpen ? ' open' : ''}><summary>All recorded values</summary>
-      <div class="scroll" style="margin-top:8px"><table class="grid summary">${head}<tbody>${details}</tbody></table></div></details>`;
+  $('#summary').innerHTML = `<div class="scroll"><table class="grid details">${head}<tbody>${rows}</tbody></table></div>
+    <details class="more" id="moreDetails"${wasOpen ? ' open' : ''}><summary>All recorded values</summary>${blocks.join('')}</details>
+    <p class="hint no-print">Open <i>All recorded values</i> to include them when printing.</p>`;
   renderCharts();
 }
 
